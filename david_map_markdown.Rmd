@@ -19,9 +19,7 @@ library(rnaturalearthdata)
 library(cowplot)
 ```
 
-
 eval = FALSE does not execute it in R but still shows the code
-
 
 ## R map of adder samples
 
