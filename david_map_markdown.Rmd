@@ -2,7 +2,7 @@
 title: "david_sample_map_creation"
 author: "dbr314"
 date: "2026-09-22"
-output: pdf_document
+output: md_document
 ---
 
 ```{r setup, include=FALSE}
