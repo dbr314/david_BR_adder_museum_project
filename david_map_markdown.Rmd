@@ -5,7 +5,7 @@ date: "2026-09-22"
 output: md_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=TRUE}
 knitr::opts_chunk$set(echo = TRUE)
 library(knitr)
 tidyverse::opts_chunk$set(echo = TRUE)
