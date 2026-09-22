@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
 # establishing filters for bash scripts
 
 ```bash
@@ -28,7 +29,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # then re-ran the saf generation using group 2 bamlist
 # this meant that only the output from "nhm.mod.fst.sh" has a different name 
 
-#then calculate per pop saf for each population
+#then calculate saf (site allele frequency) for each population
 ```
 
 # generating output file for group 1 
@@ -109,37 +110,32 @@ vim nhm.mod.fst.sh
 #SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/fst.out%J
 #job stderr file
 #SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/fst.err%J
-#SBATCH --time=2-10:00
+#SBATCH --time=1-10:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=4
-#SBATCH --mem=400G
+#SBATCH --mem=260G
 
 
 #load modules used by the script
 module purge
 module load angsd/0.935
 
-
-
 #arguments
 win1='50000'
 step1='10000'
  
-
 # pop saf lists
  
 mod_saf="/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/mod_pop_saf.saf.idx"
 nhm_saf="/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm_pop_saf.saf.idx"
 
 
-
 #Calculate the 2dsfs
 realSFS $mod_saf $nhm_saf -P 4 -seed 45 > /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.sfs
 
-
 realSFS fst index $mod_saf $nhm_saf -sfs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.sfs -fstout /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod -whichFST 1
 
-realSFS fst stats2 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.fst.idx -win $win1 -step $step1 -whichFST 1 > /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod_S9.fst.50kb.win.txt
+realSFS fst stats2 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.fst.idx -win $win1 -step $step1 -whichFST 1 > /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.fst.50kb.win.txt
 
 ```
 
@@ -147,8 +143,36 @@ realSFS fst stats2 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.
 
 ```bash
 
+vim mod_S9_pop_saf.sh
 
+#!/bin/bash
+###
+#SBATCH --account=SCWF00035_a_barlow_33
+#SBATCH --job-name=mod_S9_pop_saf
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/mod_S9_saf_out%J
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/mod_S9_saf_err%J
+#SBATCH --time=0-12:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=4
+#SBATCH --mem=6G
 
+#load modules
+module purge
+module load angsd/0.935
+
+# $1 is the path and filename of bam file to be analysed...
+
+# list of total scaffolds to be analysed
+
+scaf='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt'
+
+#reference genome fasta outgroup file, note it needs to be indexed for angsd
+
+anc='/scratch/SCWF00035/collab/outgroups/ursinii_mapped_berus/9vi+L41_urs_rVipBer3.fa'
+
+cpus=4	# no. threads for angsd
+
+angsd -b /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/bamlists/mod_NF_S9 -noTrans 1 -doSaf 1 -GL 1 -P $cpus -anc $anc -rf $scaf -out mod_pop_saf -minMapQ 30 -minQ 30 -setMinDepthInd 3 -setMaxDepthInd 17 -doCounts 1
 
 
 
@@ -156,10 +180,10 @@ vim nhm.mod.fst.sh
 
 #!/bin/bash --login
 #SBATCH --account=SCWF00035_a_barlow_33
-#SBATCH --job-name=fst
-#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/fst.out%J
+#SBATCH --job-name=fst_S9
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/fst_S9.out%J
 #job stderr file
-#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/fst.err%J
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/fst_S9.err%J
 #SBATCH --time=2-10:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=4
@@ -197,7 +221,97 @@ realSFS fst stats2 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.
 # plotting figure for group 1
 
 ```{r, echo=FALSE, eval=TRUE}
+# fst output file has fst values but no header 
+# you have to manually edit the text file
+# go to the end of the other header titles press tab once
+# type fst
 
+library(ggplot2)
+library(grid)
+
+setwd("C:/Users/dange/fst_output")
+
+
+# Read FST results
+
+fst_data <- read.table(
+  "nhm.mod.fst.50kb.win.txt",
+  header = TRUE,
+  sep = "",
+  stringsAsFactors = FALSE
+)
+
+# Make sure numerical columns are numeric
+fst_data$midPos <- as.numeric(fst_data$midPos)
+fst_data$Nsites <- as.numeric(fst_data$Nsites)
+fst_data$fst <- as.numeric(fst_data$fst)
+
+
+# Calculate mean FST for each chromosome
+chr_means <- aggregate(
+  fst ~ chr,
+  data = fst_data,
+  FUN = mean,
+  na.rm = TRUE
+)
+
+
+# Publication-quality boxplot
+
+# Set plotting parameters
+par(
+  mar = c(5, 5, 4, 2) + 0.1,
+  las = 1,
+  bty = "l"
+)
+
+boxplot(
+  fst_data$fst,
+  
+# Axis labels and title
+  xlab = "",
+  ylab = expression(F[ST]),
+  main = "Fst historic vs modern adder populations",
+  
+# Box appearance
+  col = "#D9D9D9",
+  border = "#333333",
+  lwd = 1.5,
+  
+# Don't show default outlier points
+  outline = FALSE,
+  
+# Font sizes
+  cex.axis = 1.1,
+  cex.lab = 1.2,
+  cex.main = 1.3
+)
+
+# Add mean FST for each chromosome
+
+# All chromosome means are plotted at x = 1
+points(
+  rep(1, nrow(chr_means)),
+  chr_means$fst,
+  pch = 21,
+  bg = "#E7298A",
+  col = "black",
+  cex = 1.3,
+  lwd = 1
+)
+
+# Add legend for chromosome means
+
+legend(
+  "topright",
+  legend = "Mean FST per chromosome",
+  pch = 21,
+  pt.bg = "#E7298A",
+  col = "black",
+  pt.cex = 1.2,
+  bty = "n",
+  cex = 0.9
+)
 ```
 
 # plotting figure for group 2
