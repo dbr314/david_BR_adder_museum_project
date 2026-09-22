@@ -9,22 +9,655 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## covariance matrix generated in bash for each group
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```bash
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+### group 1
 
-```{r cars}
-summary(cars)
+vim co_rmtrans.sh
+
+#!/bin/bash
+###
+#job name
+#SBATCH --job-name=co_rmtrans
+#job stdoutput file
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/co_rmtrans_pro/co_rmtrans_out%J
+#job stderror file
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/co_rmtrans_pro/co_rmtrans_err%J
+#maximum job time in D-HH:MM
+#SBATCH --time=1-10:00
+#number of nodes (axel almost never needs more than 1)
+#SBATCH --nodes=1
+#number of parallel processes (tasks) in CPU'S
+#SBATCH --ntasks=16
+#memory in Gb
+#SBATCH --mem=120G
+#assign account
+#SBATCH --account=SCWF00035_a_barlow_33
+
+module purge
+module load angsd/0.940
+
+ref='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/GCA_964194415.1_newheaders.fa'
+
+# this calculates the covariance matrix, exclude the outgroup
+#-rf = specified chromosomes
+
+
+angsd -doIBS 1 -doCov 1 -doCounts 1 -doMajorMinor 1 -GL 1 -minFreq 0.1 -minInd 28 -minQ 30 -minMapQ 30 -b /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/bamlists/mod_nhm_cov_good -ref $ref -out /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/co_rmtrans_pro/co_rmtrans_out -nThreads 10 -rmTrans 1 -trim 5 -rf /scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt
+
+
+### group 2
+
+
+vim NF_S9_co
+
+#!/bin/bash
+###
+#job name
+#SBATCH --job-name=NF_S9
+#job stdoutput file
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/co_rmtrans_pro/NF_S9_co_out%J
+#job stderror file
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/co_rmtrans_pro/NF_S9_co_out%J
+#maximum job time in D-HH:MM
+#SBATCH --time=0-05:00
+#number of nodes (axel almost never needs more than 1)
+#SBATCH --nodes=1
+#number of parallel processes (tasks) in CPU'S
+#SBATCH --ntasks=16
+#memory in Gb
+#SBATCH --mem=120G
+#assign account
+#SBATCH --account=SCWF00035_a_barlow_33
+
+module purge
+module load angsd/0.940
+
+ref='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/GCA_964194415.1_newheaders.fa'
+
+# this calculates the covariance matrix, exclude the outgroup
+#-rf = specified chromosomes
+
+
+angsd -doIBS 1 -doCov 1 -doCounts 1 -doMajorMinor 1 -GL 1 -minFreq 0.1 -minInd 20 -minQ 30 -minMapQ 30 -b /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/bamlists/NF_S9_cov -ref $ref -out /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/co_rmtrans_pro/NF_S9_cov -nThreads 10 -rmTrans 1 -trim 5 -rf /scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt
 ```
 
-## Including Plots
+## Plotting PCA in R for group 1
 
-You can also embed plots, for example:
+```{r, eval = TRUE, echo=TRUE}
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+# co_rmtrans_out.covMat
+# PCA useable files
+
+setwd("C:/Users/dange/PCA_R_working_directory")
+
+#####IN R
+
+# Read in covariance matrix's
+my_cov <- as.matrix(read.table("C:/Users/dange/PCA_R_working_directory/co_rmtrans_out.covMat"))
+
+
+# Perform PCA
+my_pca <- eigen(my_cov)
+
+
+## Read in color and legend data
+
+colour_nhm_mod <- read.csv("C:/Users/dange/PCA_R_working_directory/mod_nhm_co_good_colour_code.csv")
+
+
+## Main plot PC1 ~ PC2 
+
+pc1_var <- 100 * my_pca$values[1] / sum(my_pca$values)
+pc2_var <- 100 * my_pca$values[2] / sum(my_pca$values)
+xlab <- paste0("PC1 = ", round(pc1_var, 1), "%")
+ylab <- paste0("PC2 = ", round(pc2_var, 1), "%")
+
+
+
+# subsequent plotting of PC variables
+
+
+## PC1 ~ PC3 
+
+pc1_var <- 100 * my_pca$values[1] / sum(my_pca$values)
+pc3_var <- 100 * my_pca$values[3] / sum(my_pca$values)
+xlab <- paste0("PC1 = ", round(pc1_var, 1), "%")
+ylab <- paste0("PC3 = ", round(pc2_var, 1), "%")
+
+
+## PC1 ~ PC4
+
+pc1_var <- 100 * my_pca$values[1] / sum(my_pca$values)
+pc4_var <- 100 * my_pca$values[4] / sum(my_pca$values)
+xlab <- paste0("PC1 = ", round(pc1_var, 1), "%")
+ylab <- paste0("PC4 = ", round(pc4_var, 1), "%")
+
+
+## PC1 ~ PC5
+
+pc1_var <- 100 * my_pca$values[1] / sum(my_pca$values)
+pc5_var <- 100 * my_pca$values[5] / sum(my_pca$values)
+xlab <- paste0("PC1 = ", round(pc1_var, 1), "%")
+ylab <- paste0("PC5 = ", round(pc5_var, 1), "%")
+
+
+## setting parameters and plotting data
+## legend addition 
+## inset = c(-0.20, -0.30) makes the legend appear to the top right of area outside 
+## the graph, hence the margin manipulation 
+# "par(mar = c(5, 5, 4, 6), xpd = ## TRUE)" create the space
+
+
+## PCA all mod and nhm
+
+# 1st Number: Bottom margin 
+# 2nd Number: Left margin
+# 3rd Number: Top margin
+# 4th Number: Right margin
+
+par(mar = c(4, 5, 2, 8), xpd = TRUE)
+
+
+plot(my_pca$vectors[, 1], my_pca$vectors[, 2],
+     pch = colour_nhm_mod$pch,
+     col = colour_nhm_mod$col,
+     main = "PCA historic_bro_Lyn vs all modern V. berus n= 28",
+     xlab = xlab,
+     ylab = ylab,
+     cex = 1.9,
+     lwd = 2)
+
+
+legend("topright",
+       inset = c(-0.34, -0.0),   # negative moves legend into right margin
+       legend = c("Hist_Bro_Lyn", "Mod_other", "Mod_Bro_Lyn", "Hist_DNA_damage"),
+       pch = c(0,1,2,0),
+       col = c("#E7298A", "#999999", "#556B2F", "#030303"),
+       pt.cex = 1.3,
+       cex = 1.0,
+       x.intersp = 0.4,
+       y.intersp = 0.8,
+       bty = "n")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Plotting PCA in R for group 2 
+
+```{r, eval = TRUE, echo=TRUE}
+
+setwd("C:/Users/dange/PCA_R_working_directory")
+
+#####IN R
+
+# Read in covariance matrix
+
+my_cov_NF_S9 <- as.matrix(read.table("C:/Users/dange/PCA_R_working_directory/NF_S9_cov.covMat"))
+
+
+# Perform PCA
+
+my_pca_NF_S9 <- eigen(my_cov_NF_S9)
+
+#CLOSE ALL GRAPHICS DEVICES
+
+graphics.off()
+
+
+#PCA DATA
+
+eigenvalues <- my_pca_NF_S9$values
+vectors <- my_pca_NF_S9$vectors
+
+
+#PERCENTAGE VARIANCE
+
+variance <- 100 * eigenvalues / sum(eigenvalues)
+
+
+#AXIS LABELS
+
+pc1.lab <- paste0(
+  "PC1 (",
+  sprintf("%.1f", variance[1]),
+  "%)"
+)
+
+pc2.lab <- paste0(
+  "PC2 (",
+  sprintf("%.1f", variance[2]),
+  "%)"
+)
+
+pc3.lab <- paste0(
+  "PC3 (",
+  sprintf("%.1f", variance[3]),
+  "%)"
+)
+
+pc4.lab <- paste0(
+  "PC4 (",
+  sprintf("%.1f", variance[4]),
+  "%)"
+)
+
+pc5.lab <- paste0(
+  "PC5 (",
+  sprintf("%.1f", variance[5]),
+  "%)"
+)
+
+
+#COMMON PC1 AXIS LIMITS
+
+pc1.range <- range(
+  vectors[, 1],
+  na.rm = TRUE
+)
+
+pc1.padding <- 0.10 * diff(pc1.range)
+
+pc1.lim <- c(
+  pc1.range[1] - pc1.padding,
+  pc1.range[2] + pc1.padding
+)
+
+
+#FUNCTION FOR Y AXIS LIMITS
+
+make.lim <- function(x) {
+  
+  r <- range(
+    x,
+    na.rm = TRUE
+  )
+  
+  padding <- 0.10 * diff(r)
+  
+  c(
+    r[1] - padding,
+    r[2] + padding
+  )
+}
+
+
+pc2.lim <- make.lim(vectors[, 2])
+pc3.lim <- make.lim(vectors[, 3])
+pc4.lim <- make.lim(vectors[, 4])
+pc5.lim <- make.lim(vectors[, 5])
+
+
+#OPEN ONE LARGE LANDSCAPE PDF
+
+pdf(
+  "PCA_NF_S9_PUBLICATION_FINAL.pdf",
+  
+  width = 12,
+  height = 8,
+  
+  useDingbats = FALSE
+)
+
+
+#CREATE THE FOUR-PANEL LAYOUT
+# Main panel = 60%
+# Right column = 40%
+
+layout(
+  matrix(
+    c(
+      1, 2,
+      1, 3,
+      1, 4
+    ),
+    
+    nrow = 3,
+    
+    byrow = TRUE
+  ),
+  
+  widths = c(
+    3.0,
+    2.0
+  ),
+  
+  heights = c(
+    1,
+    1,
+    1
+  )
+)
+
+
+#PANEL A
+#MAIN PC1 vs PC2
+
+par(
+  mar = c(
+    4.8,
+    5.0,
+    3.0,
+    1.0
+  ),
+  
+  xpd = TRUE
+)
+
+
+plot(
+  vectors[, 1],
+  vectors[, 2],
+  
+  xlim = pc1.lim,
+  ylim = pc2.lim,
+  
+  pch = colour_nhm_mod_NF_S9$pch,
+  col = colour_nhm_mod_NF_S9$col,
+  
+  main =
+    "PCA historic_bro_Lyn vs modern_bro_lyn V. berus n = 20",
+  
+  xlab = pc1.lab,
+  ylab = pc2.lab,
+  
+  cex = 2,
+  lwd = 2,
+  
+  cex.main = 0.95,
+  cex.lab = 1.05,
+  
+  bty = "l"
+)
+
+
+#ORIGINAL LEGEND
+
+legend(
+  "topright",
+  
+  inset = c(
+    -0.33,
+    0
+  ),
+  
+  legend = c(
+    "Historic_Bro_Lyn",
+    "Modern_Bro_Lyn",
+    "Historic_DNA_damage"
+  ),
+  
+  pch = c(
+    0,
+    1,
+    2
+  ),
+  
+  col = c(
+    "#E7298A",
+    "#556B2F",
+    "#030303"
+  ),
+  
+  pt.cex = 1.3,
+  
+  cex = 0.6,
+  
+  x.intersp = 0.4,
+  
+  y.intersp = 0.6,
+  
+  bty = "n"
+)
+
+
+#Panel label
+
+mtext(
+  "A",
+  side = 3,
+  adj = 0,
+  line = 0.3,
+  cex = 1.4,
+  font = 2
+)
+
+
+# PANEL B
+# PC1 vs PC3
+
+par(
+  mar = c(
+    3.8,
+    4.2,
+    2.0,
+    1.2
+  ),
+  
+  xpd = FALSE
+)
+
+
+plot(
+  vectors[, 1],
+  vectors[, 3],
+  
+  xlim = pc1.lim,
+  ylim = pc3.lim,
+  
+  pch = colour_nhm_mod_NF_S9$pch,
+  col = colour_nhm_mod_NF_S9$col,
+  
+  cex = 1.15,
+  lwd = 1.5,
+  
+  main = "B",
+  
+  xlab = pc1.lab,
+  ylab = pc3.lab,
+  
+  cex.main = 1.2,
+  cex.lab = 0.85,
+  cex.axis = 0.75,
+  
+  bty = "l"
+)
+
+
+# PANEL C
+# PC1 vs PC4
+
+par(
+  mar = c(
+    3.8,
+    4.2,
+    2.0,
+    1.2
+  ),
+  
+  xpd = FALSE
+)
+
+
+plot(
+  vectors[, 1],
+  vectors[, 4],
+  
+  xlim = pc1.lim,
+  ylim = pc4.lim,
+  
+  pch = colour_nhm_mod_NF_S9$pch,
+  col = colour_nhm_mod_NF_S9$col,
+  
+  cex = 1.15,
+  lwd = 1.5,
+  
+  main = "C",
+  
+  xlab = pc1.lab,
+  ylab = pc4.lab,
+  
+  cex.main = 1.2,
+  cex.lab = 0.85,
+  cex.axis = 0.75,
+  
+  bty = "l"
+)
+
+
+# PANEL D
+# PC1 vs PC5
+
+par(
+  mar = c(
+    3.8,
+    4.2,
+    2.0,
+    1.2
+  ),
+  
+  xpd = FALSE
+)
+
+
+plot(
+  vectors[, 1],
+  vectors[, 5],
+  
+  xlim = pc1.lim,
+  ylim = pc5.lim,
+  
+  pch = colour_nhm_mod_NF_S9$pch,
+  col = colour_nhm_mod_NF_S9$col,
+  
+  cex = 1.15,
+  lwd = 1.5,
+  
+  main = "D",
+  
+  xlab = pc1.lab,
+  ylab = pc5.lab,
+  
+  cex.main = 1.2,
+  cex.lab = 0.85,
+  cex.axis = 0.75,
+  
+  bty = "l"
+)
+
+
+
+
+#add the scree plot.
+
+# Get current device dimensions
+
+device.width <- par("din")[1]
+device.height <- par("din")[2]
+
+
+# LARGE SCREE INSET
+# Position is in normalized device coordinates.
+# Move these four numbers if necessary:
+#
+#   left   = 0.31
+#   right  = 0.58
+#   bottom = 0.51
+#   top    = 0.87
+
+par(
+  fig = c(
+    0.31,
+    0.58,
+    0.51,
+    0.87
+  ),
+  
+  new = TRUE,
+  
+  mar = c(
+    3.2,
+    3.8,
+    1.0,
+    0.8
+  ),
+  
+  xpd = FALSE
+)
+
+
+#SCREE PLOT
+
+plot(
+  seq_along(eigenvalues),
+  
+  eigenvalues,
+  
+  type = "b",
+  
+  pch = 16,
+  
+  col = "black",
+  
+  lwd = 1.5,
+  
+  cex = 0.70,
+  
+  xlab = "PC",
+  
+  ylab = "Eigenvalue",
+  
+  main = "",
+  
+  cex.lab = 0.85,
+  
+  cex.axis = 0.70,
+  
+  las = 1,
+  
+  bty = "o"
+)
+
+
+# Highlight PC1 and PC2
+
+points(
+  1:2,
+  
+  eigenvalues[1:2],
+  
+  pch = 16,
+  
+  col = "#E7298A",
+  
+  cex = 0.90
+)
+
+# Eigenvalue = 1 reference line
+
+abline(
+  h = 1,
+  
+  lty = 2,
+  
+  col = "grey50",
+  
+  lwd = 1
+)
+
+
+#CLOSE PDF
+
+dev.off()
+
+
+#MESSAGE
+#so you know the code worked and saved an image 
+
+cat(
+  "\n============================================\n",
+  "Figure saved successfully:\n",
+  "PCA_NF_S9_PUBLICATION_FINAL.pdf\n",
+  "============================================\n"
+)
+```
