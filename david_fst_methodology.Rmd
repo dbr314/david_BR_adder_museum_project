@@ -1,0 +1,213 @@
+---
+title: "david_Fst_methodology"
+author: "dbr314"
+date: "2026-09-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# establishing filters for bash scripts
+
+```bash
+# -maxDepth ≈ 2–3 × (mean depth × number of individuals) is what angsd recommends 
+# 2× the mean depth (often used for low-coverage datasets)
+
+# museum samples (6+6+7+11+9+10+18+20+16+7+11) / 11 = 11  
+11 x 2 = 22
+
+# modern day all (12+10+14+22+10+14+9+6+5) + (6+6+6+6+6+6+6+10+14) / 17 = 9.882
+9.882 x 2 = 19.764  (20 for whole number) 
+
+# modern Brockenhurst and Lyndhurst (6+6+6+6+6+6+6+10+14) / 8 = 8.25
+8.25 x 2 = 16.5 (17 for whole number)
+
+# in the script "nhm.mod.fst.sh" the input files don't differ between the two groups
+# this is because to save time and space, I deleted the modern adder input saf for group 1
+# then re-ran the saf generation using group 2 bamlist
+# this meant that only the output from "nhm.mod.fst.sh" has a different name 
+
+#then calculate per pop saf for each population
+```
+
+# generating output file for group 1 
+
+```bash
+
+vim nhm_pop_saf.sh
+
+#!/bin/bash
+###
+#SBATCH --account=SCWF00035_a_barlow_33
+#SBATCH --job-name=nhm_pop_saf
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/nhm_saf_out%J
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/nhm_saf_err%J
+#SBATCH --time=0-06:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=4
+#SBATCH --mem=6G
+
+#load modules
+module purge
+module load angsd/0.935
+
+# $1 is the path and filename of bam file to be analysed
+# $3 min read depth
+# $4 max read depth
+
+# list of total scaffolds to be analysed
+
+scaf='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt'
+
+
+#reference genome fasta outgroup file, note it needs to be indexed for angsd
+
+anc='/scratch/SCWF00035/collab/outgroups/ursinii_mapped_berus/9vi+L41_urs_rVipBer3.fa'
+
+
+cpus=4	# no. threads for angsd
+
+
+angsd -b /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/bamlists/nhm_rmtrans_good -noTrans 1 -trim 5 -doSaf 1 -GL 1 -P $cpus -anc $anc -rf $scaf -out nhm_pop_saf -minMapQ 30 -minQ 30 -setMinDepthInd 3 -setMaxDepthInd 22 -doCounts 1
+
+
+vim mod_pop_saf.sh
+
+#!/bin/bash
+###
+#SBATCH --account=SCWF00035_a_barlow_33
+#SBATCH --job-name=mod_pop_saf
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/mod_saf_out%J
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/mod_saf_err%J
+#SBATCH --time=0-20:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=4
+#SBATCH --mem=10G
+
+#load modules
+module purge
+module load angsd/0.935
+
+# $1 is the path and filename of bam file to be analysed...
+
+# list of total scaffolds to be analysed
+
+scaf='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt'
+
+
+#reference genome fasta outgroup file, note it needs to be indexed for angsd
+
+anc='/scratch/SCWF00035/collab/outgroups/ursinii_mapped_berus/9vi+L41_urs_rVipBer3.fa'
+
+
+cpus=4	# no. threads for angsd
+
+
+angsd -b /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/bamlists/mod_rmtrans_good -noTrans 1 -doSaf 1 -GL 1 -P $cpus -anc $anc -rf $scaf -out mod_pop_saf -minMapQ 30 -minQ 30 -setMinDepthInd 3 -setMaxDepthInd 20 -doCounts 1
+
+
+vim nhm.mod.fst.sh
+
+#!/bin/bash --login
+#SBATCH --account=SCWF00035_a_barlow_33
+#SBATCH --job-name=fst
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/fst.out%J
+#job stderr file
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/fst.err%J
+#SBATCH --time=2-10:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=4
+#SBATCH --mem=400G
+
+
+#load modules used by the script
+module purge
+module load angsd/0.935
+
+
+
+#arguments
+win1='50000'
+step1='10000'
+ 
+
+# pop saf lists
+ 
+mod_saf="/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/mod_pop_saf.saf.idx"
+nhm_saf="/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm_pop_saf.saf.idx"
+
+
+
+#Calculate the 2dsfs
+realSFS $mod_saf $nhm_saf -P 4 -seed 45 > /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.sfs
+
+
+realSFS fst index $mod_saf $nhm_saf -sfs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.sfs -fstout /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod -whichFST 1
+
+realSFS fst stats2 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.fst.idx -win $win1 -step $step1 -whichFST 1 > /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod_S9.fst.50kb.win.txt
+
+```
+
+# generating output file for group 2
+
+```bash
+
+
+
+
+
+
+vim nhm.mod.fst.sh
+
+#!/bin/bash --login
+#SBATCH --account=SCWF00035_a_barlow_33
+#SBATCH --job-name=fst
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/fst.out%J
+#job stderr file
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/logs/fst.err%J
+#SBATCH --time=2-10:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=4
+#SBATCH --mem=400G
+
+
+#load modules used by the script
+module purge
+module load angsd/0.935
+
+
+
+#arguments
+win1='50000'
+step1='10000'
+ 
+
+# pop saf lists
+ 
+mod_saf="/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/mod_pop_saf.saf.idx"
+nhm_saf="/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm_pop_saf.saf.idx"
+
+
+
+#Calculate the 2dsfs
+realSFS $mod_saf $nhm_saf -P 4 -seed 45 > /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.sfs
+
+
+realSFS fst index $mod_saf $nhm_saf -sfs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.sfs -fstout /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod -whichFST 1
+
+realSFS fst stats2 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.fst.idx -win $win1 -step $step1 -whichFST 1 > /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod_S9.fst.50kb.win.txt
+
+```
+
+# plotting figure for group 1
+
+```{r, echo=FALSE, eval=TRUE}
+
+```
+
+# plotting figure for group 2
+
+```{r, echo=FALSE, eval=TRUE}
+
+```
