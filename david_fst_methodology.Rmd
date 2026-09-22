@@ -15,13 +15,13 @@ knitr::opts_chunk$set(echo = TRUE)
 # 2× the mean depth (often used for low-coverage datasets)
 
 # museum samples (6+6+7+11+9+10+18+20+16+7+11) / 11 = 11  
-11 x 2 = 22
+# 11 x 2 = 22
 
 # modern day all (12+10+14+22+10+14+9+6+5) + (6+6+6+6+6+6+6+10+14) / 17 = 9.882
-9.882 x 2 = 19.764  (20 for whole number) 
+# 9.882 x 2 = 19.764  (20 for whole number) 
 
 # modern Brockenhurst and Lyndhurst (6+6+6+6+6+6+6+10+14) / 8 = 8.25
-8.25 x 2 = 16.5 (17 for whole number)
+# 8.25 x 2 = 16.5 (17 for whole number)
 
 # in the script "nhm.mod.fst.sh" the input files don't differ between the two groups
 # this is because to save time and space, I deleted the modern adder input saf for group 1
@@ -60,14 +60,11 @@ module load angsd/0.935
 
 scaf='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt'
 
-
 #reference genome fasta outgroup file, note it needs to be indexed for angsd
 
 anc='/scratch/SCWF00035/collab/outgroups/ursinii_mapped_berus/9vi+L41_urs_rVipBer3.fa'
 
-
 cpus=4	# no. threads for angsd
-
 
 angsd -b /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/bamlists/nhm_rmtrans_good -noTrans 1 -trim 5 -doSaf 1 -GL 1 -P $cpus -anc $anc -rf $scaf -out nhm_pop_saf -minMapQ 30 -minQ 30 -setMinDepthInd 3 -setMaxDepthInd 22 -doCounts 1
 
@@ -95,14 +92,11 @@ module load angsd/0.935
 
 scaf='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt'
 
-
 #reference genome fasta outgroup file, note it needs to be indexed for angsd
 
 anc='/scratch/SCWF00035/collab/outgroups/ursinii_mapped_berus/9vi+L41_urs_rVipBer3.fa'
 
-
 cpus=4	# no. threads for angsd
-
 
 angsd -b /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/bamlists/mod_rmtrans_good -noTrans 1 -doSaf 1 -GL 1 -P $cpus -anc $anc -rf $scaf -out mod_pop_saf -minMapQ 30 -minQ 30 -setMinDepthInd 3 -setMaxDepthInd 20 -doCounts 1
 
