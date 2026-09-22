@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## distance matrix generation for group 1
 
 ```bash
+
 vim dmat_rmtrans.sh
 
 #!/bin/bash
@@ -47,21 +48,179 @@ angsd -doIBS 1 -makeMatrix 1 -doCounts 1 -doMajorMinor 1 -GL 1 -minFreq 0.1 -min
 
 ```bash
 
+vim NF_S9_dmat
+
+
+#!/bin/bash
+###
+#job name
+#SBATCH --job-name=NF_S9_dmat
+#job stdoutput file
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/dmat_rmtrans_pro/NF_S9_dmat_out%J
+#job stderror file
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/dmat_rmtrans_pro/NF_S9_dmat_err%J
+#maximum job time in D-HH:MM
+#SBATCH --time=0-05:00
+#number of nodes (axel almost never needs more than 1)
+#SBATCH --nodes=1
+#number of parallel processes (tasks) in CPU'S
+#SBATCH --ntasks=16
+#memory in Gb
+#SBATCH --mem=120G
+#assign account
+#SBATCH --account=SCWF00035_a_barlow_33
+
+module purge
+module load angsd/0.935
+
+ref='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/GCA_964194415.1_newheaders.fa'
+
+#-rf = specified chromosomes
+
+angsd -doIBS 1 -makeMatrix 1 -doCounts 1 -doMajorMinor 1 -GL 1 -minFreq 0.1 -minInd 21 -minQ 30 -minMapQ 30 -b /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/bamlists/NF_S9_dmat -ref $ref -out /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/dmat_rmtrans_pro/NF_S9_dmat -nThreads 10 -rmTrans 1 -trim 5 -rf /scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt
 ```
 
 
-## NJ Tree in R for group 1 
+## NJ Tree in R general setup 
 
 ```{r, eval = TRUE, echo=TRUE}
-# calculator
-1+1
 
+# dmat_rmtrans.ibsMat
+# NF_S9_dmat.ibsMat
+# tree useable file
+
+setwd("C:/Users/dange/PCA_R_working_directory")
+
+# we use the ape library
+library(ape)
+
+# read in matrix
+
+tree_matrix <- as.matrix(read.table("C:/Users/dange/tree/dmat_rmtrans.ibsMat"))
+tree_matrix_NF_S9 <- as.matrix(read.table("C:/Users/dange/tree/NF_S9_dmat.ibsMat"))
+
+
+# compute tree
+
+nhm_mod_tree <- nj(tree_matrix)
+nhm_mod_tree_NF_S9 <- nj(tree_matrix_NF_S9)
 ```
+
+## NJ Tree in R for group 1
+
+```{r, eval = TRUE, echo=TRUE}
+
+# add labels
+labels <- read.csv("C:/Users/dange/tree/tree_colour_info.csv")
+nhm_mod_tree$tip.label <- labels$sample
+
+# define colours
+tip_colours <- 
+  labels$col
+
+# Root tree
+da_root <- root(
+  nhm_mod_tree,
+  outgroup = 29
+)
+
+# Increase right-hand margin to accommodate the legend
+par(mar = c(2, 3, 2, 5))
+
+# Plot tree
+plot(
+  da_root,
+  main = "NJ tree of historic and all modern day adders",
+  tip.color = tip_colours,
+  cex = 1,
+  label.offset = 0.002
+)
+
+# Add figure legend
+legend(
+  "topright",
+  inset = c(-0.02, 0.25),
+  legend = c(
+    "Hist_Bro_Lyn",
+    "Mod_other",
+    "Mod_Bro_Lyn",
+    "Hist_DNA_damage",
+    "Outgroup_adder"
+  ),
+  col = c(
+    "#E7298A",
+    "#999999",
+    "#556B2F",
+    "#030303",
+    "#0000FF"
+  ),
+  pch = 15,
+  pt.cex = 1.1,
+  cex = 1,
+  x.intersp = 0.4,
+  y.intersp = 0.5,
+  bty = "n"
+)
+```
+
 
 ## NJ Tree in R for group 2
 
 ```{r, eval = TRUE, echo=TRUE}
-# calculator
-1+1
 
+labels_NF_S9 <- read.csv(
+  "C:/Users/dange/tree/tree_colour_info_NF_S9.csv",
+  stringsAsFactors = FALSE
+)
+
+# Add sample names to tree
+nhm_mod_tree_NF_S9$tip.label <- labels_NF_S9$sample
+
+
+# define colours from csv file
+tip_colours_NF_S9 <- 
+  labels_NF_S9$col
+
+# Root tree
+da_root_NF_S9 <- root(
+  nhm_mod_tree_NF_S9,
+  outgroup = 21
+)
+
+# Adjust margins for 21 individuals
+
+par(mar = c(2, 3, 2, 5), xpd = TRUE)
+
+# Plot tree
+plot(
+  da_root_NF_S9,
+  main = "NJ tree of historic and modern Brock and Lynd adders",
+  tip.color = tip_colours_NF_S9,
+  cex = 1,
+  label.offset = 0.002
+)
+
+# Add figure legend
+legend(
+  "topright",
+  inset = c(-0.18, -0.05),
+  legend = c(
+    "Hist_Bro_Lyn",
+    "Mod_Bro_Lyn",
+    "Hist_DNA_damage",
+    "Outgroup_adder"
+  ),
+  col = c(
+    "#E7298A",
+    "#556B2F",
+    "#030303",
+    "#0000FF"
+  ),
+  pch = 15,
+  pt.cex = 1.1,
+  cex = 1,
+  x.intersp = 0.4,
+  y.intersp = 0.5,
+  bty = "n"
+)
 ```
