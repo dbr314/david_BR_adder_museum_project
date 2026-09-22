@@ -8,23 +8,14 @@ output: md_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(knitr)
-tidyverse::opts_chunk$set(echo = TRUE)
 library(tidyverse)
-sf::opts_chunk$set(echo = TRUE)
 library(sf)
-maptiles::opts_chunk$set(echo = TRUE)
 library(maptiles)
-terra::opts_chunk$set(echo = TRUE)
 library(terra)
-ggplot2::opts_chunk$set(echo = TRUE)
 library(ggplot2)
-ggspatial::opts_chunk$set(echo = TRUE)
 library(ggspatial)
-rnaturalearth::opts_chunk$set(echo = TRUE)
 library(rnaturalearth)
-rnaturalearthdata::opts_chunk$set(echo = TRUE)
 library(rnaturalearthdata)
-cowplot::opts_chunk$set(echo = TRUE)
 library(cowplot)
 ```
 
