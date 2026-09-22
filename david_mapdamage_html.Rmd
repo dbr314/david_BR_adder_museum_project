@@ -68,7 +68,6 @@ mapDamage -i $bam -r $ref --no-stats
 this should produce two pdf files for each sample
 
 fragmentmisincorporation
-
 length plot 
 
 
