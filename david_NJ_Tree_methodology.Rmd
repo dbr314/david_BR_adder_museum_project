@@ -1,0 +1,67 @@
+---
+title: "david_NJ_Tree_methods"
+author: "dbr314"
+date: "2026-09-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## distance matrix generation for group 1
+
+```bash
+vim dmat_rmtrans.sh
+
+#!/bin/bash
+###
+#job name
+#SBATCH --job-name=dmat_rmtrans
+#job stdoutput file
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/dmat_rmtrans_pro/dmat_rmtrans_out%J
+#job stderror file
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/dmat_rmtrans_pro/dmat_rmtrans_err%J
+#maximum job time in D-HH:MM
+#SBATCH --time=1-10:00
+#number of nodes (axel almost never needs more than 1)
+#SBATCH --nodes=1
+#number of parallel processes (tasks) in CPU'S
+#SBATCH --ntasks=16
+#memory in Gb
+#SBATCH --mem=120G
+#assign account
+#SBATCH --account=SCWF00035_a_barlow_33
+
+module purge
+module load angsd/0.935
+
+ref='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/GCA_964194415.1_newheaders.fa'
+
+#-rf = specified chromosomes
+
+angsd -doIBS 1 -makeMatrix 1 -doCounts 1 -doMajorMinor 1 -GL 1 -minFreq 0.1 -minInd 29 -minQ 30 -minMapQ 30 -b /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/bamlists/mod_nhm_dmat_good -ref $ref -out /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/dmat_rmtrans_pro/dmat_rmtrans -nThreads 10 -rmTrans 1 -trim 5 -rf /scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt
+```
+
+## distance matrix generation for group 2
+
+```bash
+
+```
+
+
+## NJ Tree in R for group 1 
+
+```{r, eval = TRUE, echo=TRUE}
+# calculator
+1+1
+
+```
+
+## NJ Tree in R for group 2
+
+```{r, eval = TRUE, echo=TRUE}
+# calculator
+1+1
+
+```
