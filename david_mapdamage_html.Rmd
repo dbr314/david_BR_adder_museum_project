@@ -1,0 +1,66 @@
+---
+title: "David_mapdamage2_methods"
+author: "dbr314"
+date: "2026-09-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Mapdamage 2 running on bash
+
+## software used to assess the DNA damage of our museum adder samples
+
+```bash
+
+conda create -n mapdamage_test
+#this creates the environment labelled angsd_test using conda within your home space
+ 
+
+conda install bioconda::mapdamage2
+#installs the angsd package
+
+conda --help
+#gives a list of conda functionalities and commands
+
+conda activate mapdamage_test
+#actiates the conda environment called mapdamage_test 
+
+# create slurm script to run mapdamage software
+
+#!/bin/bash
+###
+#job name
+#SBATCH --job-name=mapdamageS22
+
+#job stdoutput file
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/mapeddamageres/mapdamageS22%J
+#job stderror file
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/mapeddamageres/mapdamageS22%J
+#maximum job time in D-HH:MM
+#SBATCH --time=0-04:00
+#number of nodes (axel almost never needs more than 1)
+#SBATCH --nodes=1
+#number of parallel processes (tasks) in CPU'S
+#SBATCH --ntasks=10
+#memory in Gb
+#SBATCH --mem=15G
+#assign account
+#SBATCH --account=SCWF00035_a_barlow_33
+
+module purge
+module load Anaconda3/2025.06-1
+source activate mapdamage_test
+
+ref='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/GCA_964194415.1_newheaders.fa'
+
+bam='/scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/46y+S22_1895_ber_rVipBer3_7.58190.bam'
+
+mapDamage -i $bam -r $ref --no-stats
+
+# re-run for all museum samples in the study, change bam file pathway each time to relevant sample bam
+```
+
+
