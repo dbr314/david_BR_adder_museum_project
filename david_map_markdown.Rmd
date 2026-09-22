@@ -23,7 +23,8 @@ eval = FALSE does not execute it in R but still shows the code
 
 ## R map of adder samples
 
-```{r, eval = FALSE, echo=TRUE}
+```{r, eval = TRUE, echo=TRUE}
+
 # set working directory
 setwd("C:/Users/dange/map")
 
