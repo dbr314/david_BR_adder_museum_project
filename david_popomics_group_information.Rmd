@@ -29,7 +29,6 @@ Additional work re-formatting graphs and figures for the final thesis
 
 no problems
 
-
 # Future work
 
 Some minor changes to results, including manhattan plots focusing on chr_7 instead of chr_1 and the removal of DNA damaged samples from some additional graphs 
@@ -39,7 +38,6 @@ Some minor changes to results, including manhattan plots focusing on chr_7 inste
 # week beginning
 
 21.09.26
-
 
 # Work achieved
 
@@ -51,12 +49,10 @@ Plotting ngsadmix results
 
 Previous week meeting edits made to graphs and figures
 
-
 # Problems
 
 fst job failed due to lack of memory
 fst job failed due to error 134 (disk quota space for the project ran out??)
-
 
 # Future work
 
