@@ -1959,6 +1959,9 @@ plot(df$depth, df$het,
 ### o8g ####
 
 
+### o8g ####
+
+
 o8g <- read.table(
   "chr_7/o8g.window.sfs",
   fill = TRUE
@@ -1982,9 +1985,8 @@ o8g_het <- o8g$het * 1000
 # Figure parameters
 # ------------------------------------------------------------
 
-
 par(
-  mar = c(5, 5, 4, 7),   # large right margin
+  mar = c(5, 5, 4, 4),   # reduced right margin
   bty = "l",
   las = 1
 )
@@ -2082,7 +2084,7 @@ par(xpd = NA)
 
 legend(
   "topright",
-  inset = c(-0.43, 0),
+  inset = c(-0.25, 0),
   legend = c(
     "het > 0.2",
     "het ≤ 0.2"
@@ -2091,10 +2093,10 @@ legend(
     "#2166AC",
     "#D73027"
   ),
-  x.intersp = 0.1,
-  y.intersp = 0.5,
+  x.intersp = 0.8,
+  y.intersp = 1.2,
   pch = 16,
-  pt.cex = 0.9,
+  pt.cex = 1.0,
   bty = "n",
   cex = 0.9
 )
@@ -2130,9 +2132,8 @@ o5k_het <- o5k$het * 1000
 # Figure parameters
 # ------------------------------------------------------------
 
-
 par(
-  mar = c(5, 5, 4, 7),   # large right margin
+  mar = c(5, 5, 4, 4),   # reduced right margin
   bty = "l",
   las = 1
 )
@@ -2230,7 +2231,7 @@ par(xpd = NA)
 
 legend(
   "topright",
-  inset = c(-0.43, 0),
+  inset = c(-0.25, 0),
   legend = c(
     "het > 0.2",
     "het ≤ 0.2"
@@ -2239,10 +2240,10 @@ legend(
     "#2166AC",
     "#D73027"
   ),
-  x.intersp = 0.1,
-  y.intersp = 0.5,
+  x.intersp = 0.8,
+  y.intersp = 1.2,
   pch = 16,
-  pt.cex = 0.9,
+  pt.cex = 1.0,
   bty = "n",
   cex = 0.9
 )
@@ -2280,9 +2281,8 @@ dfu_het <- dfu$het * 1000
 # Figure parameters
 # ------------------------------------------------------------
 
-
 par(
-  mar = c(5, 5, 4, 7),   # large right margin
+  mar = c(5, 5, 4, 4),   # reduced right margin
   bty = "l",
   las = 1
 )
@@ -2380,7 +2380,7 @@ par(xpd = NA)
 
 legend(
   "topright",
-  inset = c(-0.43, 0),
+  inset = c(-0.25, 0),
   legend = c(
     "het > 0.2",
     "het ≤ 0.2"
@@ -2389,10 +2389,10 @@ legend(
     "#2166AC",
     "#D73027"
   ),
-  x.intersp = 0.1,
-  y.intersp = 0.5,
+  x.intersp = 0.8,
+  y.intersp = 1.2,
   pch = 16,
-  pt.cex = 0.9,
+  pt.cex = 1.0,
   bty = "n",
   cex = 0.9
 )
@@ -2431,7 +2431,7 @@ rzt_het <- rzt$het * 1000
 # ------------------------------------------------------------
 
 par(
-  mar = c(5, 5, 4, 7),
+  mar = c(5, 5, 4, 4),   # reduced right margin
   bty = "l",
   las = 1,
   xpd = FALSE
@@ -2524,7 +2524,7 @@ par(xpd = NA)
 
 legend(
   "topright",
-  inset = c(-0.43, 0),
+  inset = c(-0.25, 0),
   legend = c(
     "het > 0.2",
     "het ≤ 0.2"
@@ -2533,17 +2533,16 @@ legend(
     "#2166AC",
     "#D73027"
   ),
-  x.intersp = 0.1,
-  y.intersp = 0.5,
+  x.intersp = 0.8,
+  y.intersp = 1.2,
   pch = 16,
-  pt.cex = 0.9,
+  pt.cex = 1.0,
   bty = "n",
   cex = 0.9
 )
 
 # Reset clipping
 par(xpd = FALSE)
-
 
 
 ## genetic health ##
