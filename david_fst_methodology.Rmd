@@ -215,12 +215,12 @@ realSFS $mod_saf $nhm_saf -P 4 -seed 45 > /scratch/SCWF00035/people/b.dvb25fyc_d
 realSFS fst index $mod_saf $nhm_saf -sfs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.sfs -fstout /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod -whichFST 1
 
 realSFS fst stats2 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod.fst.idx -win $win1 -step $step1 -whichFST 1 > /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.mod_S9.fst.50kb.win.txt
-
 ```
 
-# plotting figure for group 1
+# plotting figure for group 1 and 2
 
 ```{r, echo=FALSE, eval=TRUE}
+
 # fst output file has fst values but no header 
 # you have to manually edit the text file
 # go to the end of the other header titles press tab once
@@ -228,11 +228,13 @@ realSFS fst stats2 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm.
 
 library(ggplot2)
 library(grid)
+library(dplyr)
 
 setwd("C:/Users/dange/fst_output")
 
 
 # Read FST results
+
 
 fst_data <- read.table(
   "nhm.mod.fst.50kb.win.txt",
@@ -241,13 +243,26 @@ fst_data <- read.table(
   stringsAsFactors = FALSE
 )
 
+fst_data_2 <- read.table(
+  "nhm.mod_S9.fst.50kb.win.txt",
+  header = TRUE,
+  sep = "",
+  stringsAsFactors = FALSE
+)
+
+
 # Make sure numerical columns are numeric
 fst_data$midPos <- as.numeric(fst_data$midPos)
 fst_data$Nsites <- as.numeric(fst_data$Nsites)
 fst_data$fst <- as.numeric(fst_data$fst)
 
+fst_data_2$midPos <- as.numeric(fst_data_2$midPos)
+fst_data_2$Nsites <- as.numeric(fst_data_2$Nsites)
+fst_data_2$fst <- as.numeric(fst_data_2$fst)
+
 
 # Calculate mean FST for each chromosome
+
 chr_means <- aggregate(
   fst ~ chr,
   data = fst_data,
@@ -255,67 +270,116 @@ chr_means <- aggregate(
   na.rm = TRUE
 )
 
+chr_means_2 <- aggregate(
+  fst ~ chr,
+  data = fst_data_2,
+  FUN = mean,
+  na.rm = TRUE
+)
+
+# make groups for each different fst test
+
+plot_data <- bind_rows(
+  chr_means %>%
+    mutate(Population = "Modern_all_historical"),
+  chr_means_2 %>%
+    mutate(Population = "Bro_Lyn_modern_historical"),
+)
+
+# Set population order
+plot_data <- plot_data %>%
+  mutate(
+    Population = factor(
+      Population,
+      levels = c(
+        "Modern_all_historical",
+        "Bro_Lyn_modern_historical"
+      )
+    )
+  )
 
 # Publication-quality boxplot
-
-# Set plotting parameters
-par(
-  mar = c(5, 5, 4, 2) + 0.1,
-  las = 1,
-  bty = "l"
-)
-
-boxplot(
-  fst_data$fst,
+p <- ggplot(plot_data, aes(x = Population, y = fst, fill = Population)) +
   
-# Axis labels and title
-  xlab = "",
-  ylab = expression(F[ST]),
-  main = "Fst historic vs modern adder populations",
+  # Boxplots
+  geom_boxplot(
+    width = 0.55,
+    colour = "black",
+    linewidth = 0.7,
+    outlier.shape = NA,
+    alpha = 0.4
+  ) +
   
-# Box appearance
-  col = "#D9D9D9",
-  border = "#333333",
-  lwd = 1.5,
+  # adds whisker caps
   
-# Don't show default outlier points
-  outline = FALSE,
+  stat_boxplot(
+    geom = "errorbar",
+    width = 0.18
+  ) +
   
-# Font sizes
-  cex.axis = 1.1,
-  cex.lab = 1.2,
-  cex.main = 1.3
-)
+  # Individual chromosome observations
+  geom_jitter(
+    aes(colour = Population),
+    width = 0.08,
+    height = 0,
+    size = 2.8,
+    alpha = 0.85
+  ) +
+  
+  # Population colours
+  scale_fill_manual(
+    values = c(
+      "Modern_all_historical" = "#999999",
+      "Bro_Lyn_modern_historical" = "#556B2F"
+    )
+  ) +
+  
+  scale_colour_manual(
+    values = c(
+      "Modern_all_historical" = "#666666",
+      "Bro_Lyn_modern_historical" = "#556B2F"
+    )
+  ) +
+  
+  # Axis labels and title
+  labs(
+    title = "Fst results for the two groups",
+    x = NULL,
+    y = expression(F[ST])
+  ) +
+  
+  # Publication theme
+  theme_classic(base_size = 14) +
+  
+  theme(
+    plot.title = element_text(
+      size = 16,
+      face = "bold",
+      hjust = 0.5,
+      margin = margin(b = 18)
+    ),
+    axis.title.y = element_text(
+      size = 14,
+      face = "bold"
+    ),
+    axis.text.x = element_text(
+      size = 12,
+      colour = "black"
+    ),
+    axis.text.y = element_text(
+      size = 12,
+      colour = "black"
+    ),
+    axis.ticks = element_line(
+      colour = "black",
+      linewidth = 0.6
+    ),
+    axis.line = element_line(
+      colour = "black",
+      linewidth = 0.7
+    ),
+    legend.position = "none"
+  )
 
-# Add mean FST for each chromosome
-
-# All chromosome means are plotted at x = 1
-points(
-  rep(1, nrow(chr_means)),
-  chr_means$fst,
-  pch = 21,
-  bg = "#E7298A",
-  col = "black",
-  cex = 1.3,
-  lwd = 1
-)
-
-# Add legend for chromosome means
-
-legend(
-  "topright",
-  legend = "Mean FST per chromosome",
-  pch = 21,
-  pt.bg = "#E7298A",
-  col = "black",
-  pt.cex = 1.2,
-  bty = "n",
-  cex = 0.9
-)
-```
-
-# plotting figure for group 2
-
-```{r, echo=FALSE, eval=TRUE}
-
+p
 ```
