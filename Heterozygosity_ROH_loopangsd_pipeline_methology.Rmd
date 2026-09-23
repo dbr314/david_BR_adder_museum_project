@@ -1,0 +1,798 @@
+---
+title: "Heterozygosity_ROH_loopangsd_pipeline_methology"
+author: "dbr314"
+date: "2026-09-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## loopangsd pipeline in bash
+
+# depth calculation
+
+```bash
+##We made a simple rule to pick the max and min depth filters, it's essentially +/- depth/2. Depth is obtained from the BEARCAVE log and rounded to the nearest integer. When the depth is #an odd number, we round depth/2 down to obtain the min depth, and up to obtain the max depth. Thus for a depth of 7:
+
+min = 7 - (7/2 rounded down)
+    = 7 - 3
+    = 4
+
+max = 7 + (7/2 rounded up)
+    = 7 + 4
+    = 11
+
+###MIN AND MAX DEPTH FILTERS for samples
+
+# list of total scaffolds to be analysed
+
+scaf='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt'
+
+# reference genome fasta, note it needs to be indexed for angsd
+
+ref='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/GCA_964194415.1_newheaders.fa'
+
+#a file predefining the window positions, each one is then fed to angsd in a loop using the -r option
+
+win='/scratch/SCWF00035/collab/adders/loopangsd/depth/rVipBer3_50kb_windows_autosomes.txt'
+
+
+###slurm parallel script 
+
+
+vim slurm_parallel2.sh
+
+#!/usr/bin/env bash
+
+#SBATCH --account=SCWF00035_a_barlow_33
+#SBATCH --nodes=1
+#SBATCH --ntasks=28
+#SBATCH --mem=30G
+#SBATCH --output=./%J.out
+#SBATCH --error=./%J.err
+#SBATCH --time=00-04:00
+
+module purge
+module load parallel
+module load angsd/0.940
+
+# Parallel will dynamically distribute the commands in the commands_file
+# across all of the cores that were requested (ntasks)
+# n tasks have to match the number of individuals involved in the calc otherwise it gets weird
+
+commands_file=$1
+parallel < ${commands_file}
+
+
+
+###depth script 
+
+
+vim loopangsd_depth.sh
+
+
+#!/bin/bash --login
+
+
+# script to run angsd in a loop, getting around the arbitatrary way it assigns window positions
+# we also record if data is not collected for a given window
+# call the script:
+
+# bash loopangsd_het.sh $1 $2 $3 $4
+
+# $1 is the path and filename of bam file to be analysed
+# $2 is output file prefix
+# $3 min read depth
+# $4 max read depth
+
+# 3 other files are used by the script...
+
+# list of total scaffolds to be analysed
+
+scaf='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt'
+
+#reference genome fasta, note it needs to be indexed for angsd
+
+ref='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/GCA_964194415.1_newheaders.fa'
+
+#a file predefining the window positions, each one is then fed to angsd in a loop using the -r option
+
+win='/scratch/SCWF00035/collab/adders/loopangsd/depth/rVipBer3_50kb_windows_autosomes.txt'
+
+
+# and here are some other variables
+cpus=1  # no. threads for angsd
+max_depth=33 # max depth considered for depth analysis
+
+# Estimate depth per window using the doDepth function from angsd
+
+while read line; do
+
+# Run angsd -dodepth for each window
+angsd -i $1 -doDepth 1 -r $line -P $cpus -out $2_$line -minMapQ 30 -minQ 30 -setMinDepthInd $3 -setMaxDepthInd $4 -maxDepth $max_depth -doCounts 1
+
+# write to file
+paste <(echo $line) $2_$line.depthSample >> $2.window.depth
+
+# Remove outputs for this iteration
+rm $2_$line.depthSample $2_$line.depthGlobal $2_$line.arg
+
+done < $win
+
+echo "loops done!"
+
+
+###MAKE SURE THERE ARE NO HARD RETURNS IN THIS SCRIPT
+
+### commands file generation 
+
+vim commands_NFadders.txt 
+
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2cn+S3-SVb091_ber_rVipBer3_7.20274.bam 2cn 3 8
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/nu0+S6-SVb163_ber_rVipBer3_21.14275.bam nu0 7 21
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2rd+S8-SVb229_ber_rVipBer3_17.84131.bam 2rd 6 18 
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/d79+S9-SVb230_ber_rVipBer3_14.86320.bam d79 5 15
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/6i5+S10-SVb271_ber_rVipBer3_13.22348.bam 6i5 5 14
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x1t+S11-SVb316_ber_rVipBer3_9.10306.bam x1t 3 9
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o8g+S12-SVb371_ber_rVipBer3_32.21524.bam o8g 11 33
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2sj+S13-SVb399_ber_rVipBer3_14.67941.bam 2sj 5 15
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/42r+S14-SVb410_ber_rVipBer3_21.13850.bam 42r 7 21
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/46y+S22_1895_ber_rVipBer3_7.58190.bam 46y 3 9
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/h9d+S24_1895_ber_rVipBer3_7.70202.bam h9d 3 9
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/rzt+S26_1895_ber_rVipBer3_9.42227.bam rzt 4 11
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/hpa+S28_1908_ber_rVipBer3_16.86980.bam hpa 6 17
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5h5+S29_1894_ber_rVipBer3_12.72974.bam 5h5 5 14
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/vyo+S30_1894_ber_rVipBer3_13.62265.bam vyo 5 15
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4w7+S31_1917_ber_rVipBer3_27.24751.bam 4w7 9 27
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5fu+S32_1917_ber_rVipBer3_29.72487.bam 5fu 10 30
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/me5+S33_1917_ber_rVipBer3_24.70592.bam me5 8 24
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/mnw+S34_1896_ber_rVipBer3_9.99212.bam mnw 4 11
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/gvw+S35_1896_ber_rVipBer3_15.11601.bam gvw 6 17
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/ivx_th6+ww6523_ber_rVipBer3_aln_9.39783.bam ivx 3 10
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o5k_bo6+ww6524_ber_rVipBer3_aln_9.25411.bam o5k 3 10
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4rs+ww6514_ber_rVipBer3_aln_21.72646.bam 4rs 7 22
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/eyL_xaw+ww6515_ber_rVipBer3_aln_9.40289.bam eyL 3 10
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x3v_a31+ww6516_ber_rVipBer3_aln_8.82775.bam x3v 3 10
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/qdL_c8p+ww6518_ber_rVipBer3_aln_9.40188.bam qdL 3 10
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/whu_wd3+ww6519_ber_rVipBer3_aln_9.09410.bam whu 3 10
+bash loopangsd_depth.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o55+ww6522_ber_rVipBer3_aln_9.83417.bam o55 3 10
+```
+
+# site allele frequency calculation for each individual 
+
+```bash
+##saf for historic 
+
+vim angsd_NFsaf.sh
+
+#!/bin/bash
+###
+#SBATCH --account=SCWF00035_a_barlow_33
+#SBATCH --job-name=saf_NFadders
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans_saf/saf_nhm_out%J
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans_saf/saf_nhm_err%J
+#SBATCH --time=0-06:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=4
+#SBATCH --mem=6G
+
+#load modules
+module purge
+module load angsd/0.935
+
+# $1 is the path and filename of bam file to be analysed
+# $2 is output file prefix
+# $3 min read depth
+# $4 max read depth
+
+# list of total scaffolds to be analysed
+
+scaf='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt'
+
+#reference genome fasta outgroup file, note it needs to be indexed for angsd
+
+anc='/scratch/SCWF00035/collab/outgroups/ursinii_mapped_berus/9vi+L41_urs_rVipBer3.fa' 
+
+# and here are some other variables
+
+cpus=4	# no. threads for angsd
+
+# estimate site allele frequency likelihood
+# Note you only need to run this once on the whole genome, then proceed with loopangsd_het.sh etc
+
+angsd -i $1 -noTrans 1 -trim 5 -doSaf 1 -GL 1 -P $cpus -anc $anc -rf $scaf -out $2 -minMapQ 30 -minQ 30 -setMinDepthInd $3 -setMaxDepthInd $4 -doCounts 1
+
+echo "SAF done!"
+
+
+##saf for modern day
+
+vim angsd_mod_NFsaf.sh
+
+#!/bin/bash
+###
+#SBATCH --account=SCWF00035_a_barlow_33
+#SBATCH --job-name=saf_mod_NFadders
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans_saf/saf_mod_out%J
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans_saf/saf_mod_err%J
+#SBATCH --time=0-12:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=4
+#SBATCH --mem=6G
+
+#load modules
+module purge
+module load angsd/0.935
+
+# $1 is the path and filename of bam file to be analysed
+# $2 is output file prefix
+# $3 min read depth
+# $4 max read depth
+
+# list of total scaffolds to be analysed
+
+scaf='/scratch/SCWF00035/BEARCAVE0/refgenomes/rVipBer3/autosomes.txt'
+
+#reference genome fasta outgroup file, note it needs to be indexed for angsd
+
+anc='/scratch/SCWF00035/collab/outgroups/ursinii_mapped_berus/9vi+L41_urs_rVipBer3.fa' 
+
+# and here are some other variables
+
+cpus=4	# no. threads for angsd
+
+# estimate site allele frequency likelihood
+# Note you only need to run this once on the whole genome, then proceed with loopangsd_het.sh etc
+
+angsd -i $1 -noTrans 1 -doSaf 1 -GL 1 -P $cpus -anc $anc -rf $scaf -out $2 -minMapQ 30 -minQ 30 -setMinDepthInd $3 -setMaxDepthInd $4 -doCounts 1
+
+echo "SAF done!"
+
+
+##slurm script that calls on the "angsd_NFsaf.sh" script and applies processes to each sample for the historic samples 
+
+
+vim saf_NFadders.sh
+
+#!/bin/bash --login
+###
+#account
+#SBATCH --account=SCWF00035_a_barlow_33
+#job name
+#SBATCH --job-name=safi
+#job stdout file
+#SBATCH --output=./saf_out%J
+#job stderr file
+#SBATCH --error=./saf_err%J
+#maximum job time in D-HH:MM
+#SBATCH --time=0-06:00
+#number of nodes
+#SBATCH --nodes=1
+#number of parallel processes (tasks)
+#SBATCH --ntasks=4
+#memory in Gb
+#SBATCH --mem=6G
+
+#load modules used by the script
+module purge
+module load angsd/0.935
+
+# bash loopangsd_het.sh $1 $2 $3 $4
+
+# $1 is the path and filename of bam file to be analysed
+# $2 is output file prefix
+# $3 min read depth
+# $4 max read depth
+
+bash angsd_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/46y+S22_1895_ber_rVipBer3_7.58190.bam 46y 3 9
+bash angsd_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/h9d+S24_1895_ber_rVipBer3_7.70202.bam h9d 3 9
+bash angsd_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/rzt+S26_1895_ber_rVipBer3_9.42227.bam rzt 4 11
+bash angsd_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/hpa+S28_1908_ber_rVipBer3_16.86980.bam hpa 6 17
+bash angsd_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5h5+S29_1894_ber_rVipBer3_12.72974.bam 5h5 5 14
+bash angsd_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/vyo+S30_1894_ber_rVipBer3_13.62265.bam vyo 5 15
+bash angsd_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4w7+S31_1917_ber_rVipBer3_27.24751.bam 4w7 9 27
+bash angsd_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5fu+S32_1917_ber_rVipBer3_29.72487.bam 5fu 10 30
+bash angsd_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/me5+S33_1917_ber_rVipBer3_24.70592.bam me5 8 24
+bash angsd_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/mnw+S34_1896_ber_rVipBer3_9.99212.bam mnw 4 11
+bash angsd_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/gvw+S35_1896_ber_rVipBer3_15.11601.bam gvw 6 17
+
+
+####slurm script that calls on the "angsd_mod_NFsaf.sh" script and applies processes to each sample for the modern day samples 
+
+vim saf_mod_NFadders.sh
+
+#!/bin/bash --login
+###
+#account
+#SBATCH --account=SCWF00035_a_barlow_33
+#job name
+#SBATCH --job-name=safi_mod
+#job stdout file
+#SBATCH --output=./saf_mod_out%J
+#job stderr file
+#SBATCH --error=./saf_mod_err%J
+#maximum job time in D-HH:MM
+#SBATCH --time=0-12:00
+#number of nodes
+#SBATCH --nodes=1
+#number of parallel processes (tasks)
+#SBATCH --ntasks=4
+#memory in Gb
+#SBATCH --mem=6G
+
+#load modules used by the script
+module purge
+module load angsd/0.935
+
+# bash loopangsd_het.sh $1 $2 $3 $4
+
+# $1 is the path and filename of bam file to be analysed
+# $2 is output file prefix
+# $3 min read depth
+# $4 max read depth
+
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2cn+S3-SVb091_ber_rVipBer3_7.20274.bam 2cn 3 8
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/nu0+S6-SVb163_ber_rVipBer3_21.14275.bam nu0 7 21
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2rd+S8-SVb229_ber_rVipBer3_17.84131.bam 2rd 6 18 
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/d79+S9-SVb230_ber_rVipBer3_14.86320.bam d79 5 15
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/6i5+S10-SVb271_ber_rVipBer3_13.22348.bam 6i5 5 14
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x1t+S11-SVb316_ber_rVipBer3_9.10306.bam x1t 3 9
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o8g+S12-SVb371_ber_rVipBer3_32.21524.bam o8g 11 33
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2sj+S13-SVb399_ber_rVipBer3_14.67941.bam 2sj 5 15
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/42r+S14-SVb410_ber_rVipBer3_21.13850.bam 42r 7 21
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3/ivx_th6+ww6523_ber_rVipBer3_10.11033.bam ivx 3 10
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3/o5k_bo6+ww6524_ber_rVipBer3_9.93584.bam o5k 3 10
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3/4rs+ww6514_ber_rVipBer3_23.24245.bam 4rs 8 23
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3/eyL_xaw+ww6515_ber_rVipBer3_10.18655.bam eyL 3 10
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3/x3v_a31+ww6516_ber_rVipBer3_9.50278.bam x3v 3 10
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3/qdL_c8p+ww6518_ber_rVipBer3_10.22644.bam qdL 4 11
+bash angsd_mod_NFsaf.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3/whu_wd3+ww6519_ber_rVipBer3_9.79933.bam whu 3 10
+```
+
+# Heterozygosity sfs file generation for each sample
+
+```bash
+vim slurm_parallel2_chr.sh
+
+#!/usr/bin/env bash
+
+#SBATCH --account=SCWF00035_a_barlow_33
+#SBATCH --nodes=1
+#SBATCH --ntasks=28
+#SBATCH --mem=32G
+#SBATCH --output=./logs/%J.out
+#SBATCH --error=./logs/%J.err
+#SBATCH --time=01-15:00
+
+module purge
+module load parallel
+module load angsd/0.935
+
+# Parallel will dynamically distribute the commands in the commands_file
+# across all of the cores that were requested (ntasks)
+commands_file=$1
+parallel < ${commands_file}
+
+
+#het script copied from collab using 
+
+cp -a /scratch/SCWF00035/collab/adders/loopangsd/het_chr/loopangsd_het_chr2.sh . /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het 
+
+#this copies everything within the source directory and then I have to delete a bunch of stuff
+
+rm -r 
+
+#deletes folder with everything in it, use wisely 
+
+
+###het script
+
+vim loopangsd_het_chr2.sh
+
+#!/bin/bash --login
+#SBATCH --account=SCWF00035_a_barlow_33
+
+# script to run angsd in a loop, getting around the arbitrary way it assigns window positions
+# we also record if data is not collected for a given window
+
+# note you need to have calculated the SAF in advance using angsd, and have the file prefixes matching those used here
+# The idea is you use this script on individual chr, and process multiple individals simultaneously using parallel
+
+# call the script:
+
+# $1 is the path and filename of bam file to be analysed
+# $2 is output file prefix
+# $3 is path and file predefining the window positions
+# $4 is output folder (omit trailing/)
+
+# and here are some other variables
+
+saf='/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans_saf'	
+# path to precalculated SAF files
+
+cpus=1			
+
+# no. threads for angsd
+
+# get rid of any existing file
+rm $4/$2.window.sfs
+
+# Loop through windows and calculate sfs
+# The output is the window position as shown above, followed by the sfs estimation
+
+	while read line; do
+		realSFS $saf/$2.saf.idx -r $line -P $cpus > $4/$2_$line.sfs
+		paste <(echo $line) $4/$2_$line.sfs >> $4/$2.window.sfs
+		rm $4/$2_$line.sfs
+	done < $3
+
+echo "loops done!"
+
+##when running the parallel script on multiple chromosomes use
+
+sbatch slurm_parallel2_chr.sh ./chr_1/commands_chr1.txt
+
+#change the directory "chr_1" and "commands_chr1.tx" to reflect the different chr each time you run this command
+
+# parallel commands in full
+
+sbatch slurm_parallel2_chr.sh ./chr_1/commands_chr1.txt
+sbatch slurm_parallel2_chr.sh ./chr_2/commands_chr2.txt
+sbatch slurm_parallel2_chr.sh ./chr_3/commands_chr3.txt 
+sbatch slurm_parallel2_chr.sh ./chr_4/commands_chr4.txt 
+sbatch slurm_parallel2_chr.sh ./chr_5/commands_chr5.txt  
+sbatch slurm_parallel2_chr.sh ./chr_6/commands_chr6.txt  
+sbatch slurm_parallel2_chr.sh ./chr_7/commands_chr7.txt 
+sbatch slurm_parallel2_chr.sh ./chr_8-17/commands_chr8-17.txt 
+
+# when files have been generated 
+
+# First generate a filein shell concatenating all chr for one individual, e.g.
+# cat ./het_chr/chr_*/R06.window.sfs > R06_all.window.sfs
+# The cat command is used to show the content of files in the terminal. You can also use it to combine multiple files into one
+
+#cat commands for each individual 
+ 
+
+vim cat_command.sh
+
+cat ./het_rmtrans/chr_*/2cn.window.sfs > 2cn_all.window.sfs
+cat ./het_rmtrans/chr_*/nu0.window.sfs > nu0_all.window.sfs 
+cat ./het_rmtrans/chr_*/2rd.window.sfs > 2rd_all.window.sfs 
+cat ./het_rmtrans/chr_*/d79.window.sfs > d79_all.window.sfs 
+cat ./het_rmtrans/chr_*/6i5.window.sfs > 6i5_all.window.sfs 
+cat ./het_rmtrans/chr_*/x1t.window.sfs > x1t_all.window.sfs 
+cat ./het_rmtrans/chr_*/o8g.window.sfs > o8g_all.window.sfs 
+cat ./het_rmtrans/chr_*/2sj.window.sfs > 2sj_all.window.sfs 
+cat ./het_rmtrans/chr_*/42r.window.sfs > 42r_all.window.sfs 
+cat ./het_rmtrans/chr_*/46y.window.sfs > 46y_all.window.sfs
+cat ./het_rmtrans/chr_*/h9d.window.sfs > h9d_all.window.sfs 
+cat ./het_rmtrans/chr_*/rzt.window.sfs > rzt_all.window.sfs 
+cat ./het_rmtrans/chr_*/hpa.window.sfs > hpa_all.window.sfs 
+cat ./het_rmtrans/chr_*/5h5.window.sfs > 5h5_all.window.sfs 
+cat ./het_rmtrans/chr_*/vyo.window.sfs > vyo_all.window.sfs 
+cat ./het_rmtrans/chr_*/4w7.window.sfs > 4w7_all.window.sfs 
+cat ./het_rmtrans/chr_*/5fu.window.sfs > 5fu_all.window.sfs 
+cat ./het_rmtrans/chr_*/me5.window.sfs > me5_all.window.sfs 
+cat ./het_rmtrans/chr_*/mnw.window.sfs > mnw_all.window.sfs 
+cat ./het_rmtrans/chr_*/gvw.window.sfs > gvw_all.window.sfs 
+cat ./het_rmtrans/chr_*/ivx.window.sfs > ivx_all.window.sfs 
+cat ./het_rmtrans/chr_*/o5k.window.sfs > o5k_all.window.sfs 
+cat ./het_rmtrans/chr_*/4rs.window.sfs > 4rs_all.window.sfs 
+cat ./het_rmtrans/chr_*/eyL.window.sfs > eyL_all.window.sfs 
+cat ./het_rmtrans/chr_*/x3v.window.sfs > x3v_all.window.sfs 
+cat ./het_rmtrans/chr_*/qdL.window.sfs > qdL_all.window.sfs 
+cat ./het_rmtrans/chr_*/whu.window.sfs > whu_all.window.sfs 
+cat ./het_rmtrans/chr_*/o55.window.sfs > o55_all.window.sfs 
+
+bash cat_command.sh
+
+#for the plotting of ROH and HET in R you require the .sfs files for each individual for each chr and the total .sfs files for each individual over all chr
+```
+
+# Heterozygosity sfs command file generation that applies sfs file generation scripts
+
+```bash
+###chr_1
+
+vim commands_chr1.txt
+
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2cn+S3-SVb091_ber_rVipBer3_7.20274.bam 2cn /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/nu0+S6-SVb163_ber_rVipBer3_21.14275.bam nu0 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2rd+S8-SVb229_ber_rVipBer3_17.84131.bam 2rd /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/d79+S9-SVb230_ber_rVipBer3_14.86320.bam d79 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/6i5+S10-SVb271_ber_rVipBer3_13.22348.bam 6i5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x1t+S11-SVb316_ber_rVipBer3_9.10306.bam x1t /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o8g+S12-SVb371_ber_rVipBer3_32.21524.bam o8g /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2sj+S13-SVb399_ber_rVipBer3_14.67941.bam 2sj /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/42r+S14-SVb410_ber_rVipBer3_21.13850.bam 42r /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/46y+S22_1895_ber_rVipBer3_7.58190.bam 46y /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/h9d+S24_1895_ber_rVipBer3_7.70202.bam h9d /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/rzt+S26_1895_ber_rVipBer3_9.42227.bam rzt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/hpa+S28_1908_ber_rVipBer3_16.86980.bam hpa /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5h5+S29_1894_ber_rVipBer3_12.72974.bam 5h5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/vyo+S30_1894_ber_rVipBer3_13.62265.bam vyo /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4w7+S31_1917_ber_rVipBer3_27.24751.bam 4w7 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5fu+S32_1917_ber_rVipBer3_29.72487.bam 5fu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/me5+S33_1917_ber_rVipBer3_24.70592.bam me5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/mnw+S34_1896_ber_rVipBer3_9.99212.bam mnw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/gvw+S35_1896_ber_rVipBer3_15.11601.bam gvw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/ivx_th6+ww6523_ber_rVipBer3_aln_9.39783.bam ivx /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o5k_bo6+ww6524_ber_rVipBer3_aln_9.25411.bam o5k /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4rs+ww6514_ber_rVipBer3_aln_21.72646.bam 4rs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/eyL_xaw+ww6515_ber_rVipBer3_aln_9.40289.bam eyL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x3v_a31+ww6516_ber_rVipBer3_aln_8.82775.bam x3v /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/qdL_c8p+ww6518_ber_rVipBer3_aln_9.40188.bam qdL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/whu_wd3+ww6519_ber_rVipBer3_aln_9.09410.bam whu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o55+ww6522_ber_rVipBer3_aln_9.83417.bam o55 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1/chr_1_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_1
+
+
+
+###chr_2
+
+vim commands_chr2.txt
+
+
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2cn+S3-SVb091_ber_rVipBer3_7.20274.bam 2cn /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2 
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/nu0+S6-SVb163_ber_rVipBer3_21.14275.bam nu0 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2rd+S8-SVb229_ber_rVipBer3_17.84131.bam 2rd /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/d79+S9-SVb230_ber_rVipBer3_14.86320.bam d79 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/6i5+S10-SVb271_ber_rVipBer3_13.22348.bam 6i5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x1t+S11-SVb316_ber_rVipBer3_9.10306.bam x1t /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o8g+S12-SVb371_ber_rVipBer3_32.21524.bam o8g /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2sj+S13-SVb399_ber_rVipBer3_14.67941.bam 2sj /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/42r+S14-SVb410_ber_rVipBer3_21.13850.bam 42r /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/46y+S22_1895_ber_rVipBer3_7.58190.bam 46y /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/h9d+S24_1895_ber_rVipBer3_7.70202.bam h9d /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/rzt+S26_1895_ber_rVipBer3_9.42227.bam rzt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/hpa+S28_1908_ber_rVipBer3_16.86980.bam hpa /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5h5+S29_1894_ber_rVipBer3_12.72974.bam 5h5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/vyo+S30_1894_ber_rVipBer3_13.62265.bam vyo /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4w7+S31_1917_ber_rVipBer3_27.24751.bam 4w7 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5fu+S32_1917_ber_rVipBer3_29.72487.bam 5fu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/me5+S33_1917_ber_rVipBer3_24.70592.bam me5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/mnw+S34_1896_ber_rVipBer3_9.99212.bam mnw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/gvw+S35_1896_ber_rVipBer3_15.11601.bam gvw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/ivx_th6+ww6523_ber_rVipBer3_aln_9.39783.bam ivx /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o5k_bo6+ww6524_ber_rVipBer3_aln_9.25411.bam o5k /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4rs+ww6514_ber_rVipBer3_aln_21.72646.bam 4rs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/eyL_xaw+ww6515_ber_rVipBer3_aln_9.40289.bam eyL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x3v_a31+ww6516_ber_rVipBer3_aln_8.82775.bam x3v /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/qdL_c8p+ww6518_ber_rVipBer3_aln_9.40188.bam qdL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/whu_wd3+ww6519_ber_rVipBer3_aln_9.09410.bam whu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o55+ww6522_ber_rVipBer3_aln_9.83417.bam o55 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2/chr_2_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_2
+
+
+
+
+
+###chr_3
+
+vim commands_chr3.txt
+
+
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2cn+S3-SVb091_ber_rVipBer3_7.20274.bam 2cn /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/nu0+S6-SVb163_ber_rVipBer3_21.14275.bam nu0 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2rd+S8-SVb229_ber_rVipBer3_17.84131.bam 2rd /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/d79+S9-SVb230_ber_rVipBer3_14.86320.bam d79 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/6i5+S10-SVb271_ber_rVipBer3_13.22348.bam 6i5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x1t+S11-SVb316_ber_rVipBer3_9.10306.bam x1t /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o8g+S12-SVb371_ber_rVipBer3_32.21524.bam o8g /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2sj+S13-SVb399_ber_rVipBer3_14.67941.bam 2sj /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/42r+S14-SVb410_ber_rVipBer3_21.13850.bam 42r /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/46y+S22_1895_ber_rVipBer3_7.58190.bam 46y /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/h9d+S24_1895_ber_rVipBer3_7.70202.bam h9d /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/rzt+S26_1895_ber_rVipBer3_9.42227.bam rzt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/hpa+S28_1908_ber_rVipBer3_16.86980.bam hpa /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5h5+S29_1894_ber_rVipBer3_12.72974.bam 5h5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/vyo+S30_1894_ber_rVipBer3_13.62265.bam vyo /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4w7+S31_1917_ber_rVipBer3_27.24751.bam 4w7 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5fu+S32_1917_ber_rVipBer3_29.72487.bam 5fu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/me5+S33_1917_ber_rVipBer3_24.70592.bam me5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/mnw+S34_1896_ber_rVipBer3_9.99212.bam mnw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/gvw+S35_1896_ber_rVipBer3_15.11601.bam gvw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/ivx_th6+ww6523_ber_rVipBer3_aln_9.39783.bam ivx /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o5k_bo6+ww6524_ber_rVipBer3_aln_9.25411.bam o5k /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4rs+ww6514_ber_rVipBer3_aln_21.72646.bam 4rs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/eyL_xaw+ww6515_ber_rVipBer3_aln_9.40289.bam eyL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x3v_a31+ww6516_ber_rVipBer3_aln_8.82775.bam x3v /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/qdL_c8p+ww6518_ber_rVipBer3_aln_9.40188.bam qdL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/whu_wd3+ww6519_ber_rVipBer3_aln_9.09410.bam whu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o55+ww6522_ber_rVipBer3_aln_9.83417.bam o55 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3/chr_3_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_3
+
+
+
+
+
+
+###chr_4
+
+vim commands_chr4.txt
+
+
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2cn+S3-SVb091_ber_rVipBer3_7.20274.bam 2cn /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/nu0+S6-SVb163_ber_rVipBer3_21.14275.bam nu0 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2rd+S8-SVb229_ber_rVipBer3_17.84131.bam 2rd /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/d79+S9-SVb230_ber_rVipBer3_14.86320.bam d79 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/6i5+S10-SVb271_ber_rVipBer3_13.22348.bam 6i5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x1t+S11-SVb316_ber_rVipBer3_9.10306.bam x1t /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o8g+S12-SVb371_ber_rVipBer3_32.21524.bam o8g /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2sj+S13-SVb399_ber_rVipBer3_14.67941.bam 2sj /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/42r+S14-SVb410_ber_rVipBer3_21.13850.bam 42r /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/46y+S22_1895_ber_rVipBer3_7.58190.bam 46y /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/h9d+S24_1895_ber_rVipBer3_7.70202.bam h9d /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/rzt+S26_1895_ber_rVipBer3_9.42227.bam rzt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/hpa+S28_1908_ber_rVipBer3_16.86980.bam hpa /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5h5+S29_1894_ber_rVipBer3_12.72974.bam 5h5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/vyo+S30_1894_ber_rVipBer3_13.62265.bam vyo /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4w7+S31_1917_ber_rVipBer3_27.24751.bam 4w7 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5fu+S32_1917_ber_rVipBer3_29.72487.bam 5fu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/me5+S33_1917_ber_rVipBer3_24.70592.bam me5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/mnw+S34_1896_ber_rVipBer3_9.99212.bam mnw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/gvw+S35_1896_ber_rVipBer3_15.11601.bam gvw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/ivx_th6+ww6523_ber_rVipBer3_aln_9.39783.bam ivx /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o5k_bo6+ww6524_ber_rVipBer3_aln_9.25411.bam o5k /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4rs+ww6514_ber_rVipBer3_aln_21.72646.bam 4rs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/eyL_xaw+ww6515_ber_rVipBer3_aln_9.40289.bam eyL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x3v_a31+ww6516_ber_rVipBer3_aln_8.82775.bam x3v /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/qdL_c8p+ww6518_ber_rVipBer3_aln_9.40188.bam qdL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/whu_wd3+ww6519_ber_rVipBer3_aln_9.09410.bam whu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o55+ww6522_ber_rVipBer3_aln_9.83417.bam o55 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4/chr_4_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_4
+
+
+
+
+###chr_5
+ 
+vim commands_chr5.txt
+
+
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2cn+S3-SVb091_ber_rVipBer3_7.20274.bam 2cn /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/nu0+S6-SVb163_ber_rVipBer3_21.14275.bam nu0 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2rd+S8-SVb229_ber_rVipBer3_17.84131.bam 2rd /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/d79+S9-SVb230_ber_rVipBer3_14.86320.bam d79 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/6i5+S10-SVb271_ber_rVipBer3_13.22348.bam 6i5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x1t+S11-SVb316_ber_rVipBer3_9.10306.bam x1t /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o8g+S12-SVb371_ber_rVipBer3_32.21524.bam o8g /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2sj+S13-SVb399_ber_rVipBer3_14.67941.bam 2sj /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/42r+S14-SVb410_ber_rVipBer3_21.13850.bam 42r /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/46y+S22_1895_ber_rVipBer3_7.58190.bam 46y /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/h9d+S24_1895_ber_rVipBer3_7.70202.bam h9d /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/rzt+S26_1895_ber_rVipBer3_9.42227.bam rzt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/hpa+S28_1908_ber_rVipBer3_16.86980.bam hpa /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5h5+S29_1894_ber_rVipBer3_12.72974.bam 5h5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/vyo+S30_1894_ber_rVipBer3_13.62265.bam vyo /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4w7+S31_1917_ber_rVipBer3_27.24751.bam 4w7 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5fu+S32_1917_ber_rVipBer3_29.72487.bam 5fu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/me5+S33_1917_ber_rVipBer3_24.70592.bam me5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/mnw+S34_1896_ber_rVipBer3_9.99212.bam mnw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/gvw+S35_1896_ber_rVipBer3_15.11601.bam gvw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/ivx_th6+ww6523_ber_rVipBer3_aln_9.39783.bam ivx /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o5k_bo6+ww6524_ber_rVipBer3_aln_9.25411.bam o5k /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4rs+ww6514_ber_rVipBer3_aln_21.72646.bam 4rs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/eyL_xaw+ww6515_ber_rVipBer3_aln_9.40289.bam eyL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x3v_a31+ww6516_ber_rVipBer3_aln_8.82775.bam x3v /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/qdL_c8p+ww6518_ber_rVipBer3_aln_9.40188.bam qdL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/whu_wd3+ww6519_ber_rVipBer3_aln_9.09410.bam whu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o55+ww6522_ber_rVipBer3_aln_9.83417.bam o55 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5/chr_5_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_5
+
+
+
+###chr_6
+
+vim commands_chr6.txt
+
+
+
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2cn+S3-SVb091_ber_rVipBer3_7.20274.bam 2cn /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/nu0+S6-SVb163_ber_rVipBer3_21.14275.bam nu0 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2rd+S8-SVb229_ber_rVipBer3_17.84131.bam 2rd /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/d79+S9-SVb230_ber_rVipBer3_14.86320.bam d79 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/6i5+S10-SVb271_ber_rVipBer3_13.22348.bam 6i5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x1t+S11-SVb316_ber_rVipBer3_9.10306.bam x1t /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o8g+S12-SVb371_ber_rVipBer3_32.21524.bam o8g /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2sj+S13-SVb399_ber_rVipBer3_14.67941.bam 2sj /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/42r+S14-SVb410_ber_rVipBer3_21.13850.bam 42r /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/46y+S22_1895_ber_rVipBer3_7.58190.bam 46y /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/h9d+S24_1895_ber_rVipBer3_7.70202.bam h9d /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/rzt+S26_1895_ber_rVipBer3_9.42227.bam rzt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/hpa+S28_1908_ber_rVipBer3_16.86980.bam hpa /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5h5+S29_1894_ber_rVipBer3_12.72974.bam 5h5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/vyo+S30_1894_ber_rVipBer3_13.62265.bam vyo /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4w7+S31_1917_ber_rVipBer3_27.24751.bam 4w7 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5fu+S32_1917_ber_rVipBer3_29.72487.bam 5fu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/me5+S33_1917_ber_rVipBer3_24.70592.bam me5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/mnw+S34_1896_ber_rVipBer3_9.99212.bam mnw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/gvw+S35_1896_ber_rVipBer3_15.11601.bam gvw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/ivx_th6+ww6523_ber_rVipBer3_aln_9.39783.bam ivx /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o5k_bo6+ww6524_ber_rVipBer3_aln_9.25411.bam o5k /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4rs+ww6514_ber_rVipBer3_aln_21.72646.bam 4rs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/eyL_xaw+ww6515_ber_rVipBer3_aln_9.40289.bam eyL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x3v_a31+ww6516_ber_rVipBer3_aln_8.82775.bam x3v /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/qdL_c8p+ww6518_ber_rVipBer3_aln_9.40188.bam qdL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/whu_wd3+ww6519_ber_rVipBer3_aln_9.09410.bam whu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o55+ww6522_ber_rVipBer3_aln_9.83417.bam o55 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6/chr_6_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_6
+
+
+###chr_7
+
+vim commands_chr7.txt
+
+
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2cn+S3-SVb091_ber_rVipBer3_7.20274.bam 2cn /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/nu0+S6-SVb163_ber_rVipBer3_21.14275.bam nu0 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2rd+S8-SVb229_ber_rVipBer3_17.84131.bam 2rd /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/d79+S9-SVb230_ber_rVipBer3_14.86320.bam d79 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/6i5+S10-SVb271_ber_rVipBer3_13.22348.bam 6i5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x1t+S11-SVb316_ber_rVipBer3_9.10306.bam x1t /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o8g+S12-SVb371_ber_rVipBer3_32.21524.bam o8g /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2sj+S13-SVb399_ber_rVipBer3_14.67941.bam 2sj /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/42r+S14-SVb410_ber_rVipBer3_21.13850.bam 42r /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/46y+S22_1895_ber_rVipBer3_7.58190.bam 46y /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/h9d+S24_1895_ber_rVipBer3_7.70202.bam h9d /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/rzt+S26_1895_ber_rVipBer3_9.42227.bam rzt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/hpa+S28_1908_ber_rVipBer3_16.86980.bam hpa /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5h5+S29_1894_ber_rVipBer3_12.72974.bam 5h5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/vyo+S30_1894_ber_rVipBer3_13.62265.bam vyo /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4w7+S31_1917_ber_rVipBer3_27.24751.bam 4w7 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5fu+S32_1917_ber_rVipBer3_29.72487.bam 5fu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/me5+S33_1917_ber_rVipBer3_24.70592.bam me5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/mnw+S34_1896_ber_rVipBer3_9.99212.bam mnw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/gvw+S35_1896_ber_rVipBer3_15.11601.bam gvw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/ivx_th6+ww6523_ber_rVipBer3_aln_9.39783.bam ivx /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o5k_bo6+ww6524_ber_rVipBer3_aln_9.25411.bam o5k /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4rs+ww6514_ber_rVipBer3_aln_21.72646.bam 4rs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/eyL_xaw+ww6515_ber_rVipBer3_aln_9.40289.bam eyL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x3v_a31+ww6516_ber_rVipBer3_aln_8.82775.bam x3v /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/qdL_c8p+ww6518_ber_rVipBer3_aln_9.40188.bam qdL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/whu_wd3+ww6519_ber_rVipBer3_aln_9.09410.bam whu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o55+ww6522_ber_rVipBer3_aln_9.83417.bam o55 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7/chr_7_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_7
+
+
+
+
+###chr_8-17
+
+vim commands_chr8-17.txt
+
+
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2cn+S3-SVb091_ber_rVipBer3_7.20274.bam 2cn /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/nu0+S6-SVb163_ber_rVipBer3_21.14275.bam nu0 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2rd+S8-SVb229_ber_rVipBer3_17.84131.bam 2rd /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/d79+S9-SVb230_ber_rVipBer3_14.86320.bam d79 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/6i5+S10-SVb271_ber_rVipBer3_13.22348.bam 6i5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x1t+S11-SVb316_ber_rVipBer3_9.10306.bam x1t /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o8g+S12-SVb371_ber_rVipBer3_32.21524.bam o8g /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/2sj+S13-SVb399_ber_rVipBer3_14.67941.bam 2sj /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/42r+S14-SVb410_ber_rVipBer3_21.13850.bam 42r /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/46y+S22_1895_ber_rVipBer3_7.58190.bam 46y /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/h9d+S24_1895_ber_rVipBer3_7.70202.bam h9d /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/rzt+S26_1895_ber_rVipBer3_9.42227.bam rzt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/hpa+S28_1908_ber_rVipBer3_16.86980.bam hpa /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5h5+S29_1894_ber_rVipBer3_12.72974.bam 5h5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/vyo+S30_1894_ber_rVipBer3_13.62265.bam vyo /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4w7+S31_1917_ber_rVipBer3_27.24751.bam 4w7 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/5fu+S32_1917_ber_rVipBer3_29.72487.bam 5fu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/me5+S33_1917_ber_rVipBer3_24.70592.bam me5 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/mnw+S34_1896_ber_rVipBer3_9.99212.bam mnw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/gvw+S35_1896_ber_rVipBer3_15.11601.bam gvw /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/ivx_th6+ww6523_ber_rVipBer3_aln_9.39783.bam ivx /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o5k_bo6+ww6524_ber_rVipBer3_aln_9.25411.bam o5k /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/4rs+ww6514_ber_rVipBer3_aln_21.72646.bam 4rs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/eyL_xaw+ww6515_ber_rVipBer3_aln_9.40289.bam eyL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/x3v_a31+ww6516_ber_rVipBer3_aln_8.82775.bam x3v /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/qdL_c8p+ww6518_ber_rVipBer3_aln_9.40188.bam qdL /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/whu_wd3+ww6519_ber_rVipBer3_aln_9.09410.bam whu /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+bash loopangsd_het_chr2.sh /scratch/SCWF00035/BEARCAVE0/mappedrVipBer3_aln/o55+ww6522_ber_rVipBer3_aln_9.83417.bam o55 /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17/chr_8-17_50kb_windows.txt /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/het_rmtrans/chr_8-17
+```
+
+
+
+
+# plotting of heterozygosity and runs of homozygosity graphs 
+
+```{r, echo=FALSE, eval=TRUE}
+
+```
