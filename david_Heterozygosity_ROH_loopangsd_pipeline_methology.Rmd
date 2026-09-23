@@ -1960,7 +1960,7 @@ plot(df$depth, df$het,
 
 
 o8g <- read.table(
-  "chr_1/o8g.window.sfs",
+  "chr_7/o8g.window.sfs",
   fill = TRUE
 ) %>%
   mutate(
@@ -2010,7 +2010,7 @@ plot(
   yaxs = "i",
   
   xaxt = "n",
-  xlab = "Position in chr_1 (Mb)",
+  xlab = "Position in chr_7 (Mb)",
   ylab = "het/kb",
   main = "o8g-S12-SVb371 mod other",
   
@@ -2108,7 +2108,7 @@ par(xpd = FALSE)
 
 
 o5k <- read.table(
-  "chr_1/o5k.window.sfs",
+  "chr_7/o5k.window.sfs",
   fill = TRUE
 ) %>%
   mutate(
@@ -2158,7 +2158,7 @@ plot(
   yaxs = "i",
   
   xaxt = "n",
-  xlab = "Position in chr_1 (Mb)",
+  xlab = "Position in chr_7 (Mb)",
   ylab = "het/kb",
   main = "o5k_bo6-ww6524 mod Lyndhurst",
   
@@ -2258,7 +2258,7 @@ par(xpd = FALSE)
 ### 5fu ###
 
 dfu <- read.table(
-  "chr_1/5fu.window.sfs",
+  "chr_7/5fu.window.sfs",
   fill = TRUE
 ) %>%
   mutate(
@@ -2308,7 +2308,7 @@ plot(
   yaxs = "i",
   
   xaxt = "n",
-  xlab = "Position in chr_1 (Mb)",
+  xlab = "Position in chr_7 (Mb)",
   ylab = "het/kb",
   main = "5fu-S32_1917 hist Brockenhurst",
   
@@ -2408,7 +2408,7 @@ par(xpd = FALSE)
 # x axis and figure legend were being removed 
 
 rzt <- read.table(
-  "chr_1/rzt.window.sfs",
+  "chr_7/rzt.window.sfs",
   fill = TRUE
 ) %>%
   mutate(
@@ -2458,7 +2458,7 @@ plot(
   yaxs = "i",
   
   xaxt = "n",
-  xlab = "Position in chr_1 (Mb)",
+  xlab = "Position in chr_7 (Mb)",
   ylab = "het/kb",
   main = "rzt-S26_1895 hist Lyndhurst",
   
@@ -2543,6 +2543,7 @@ legend(
 
 # Reset clipping
 par(xpd = FALSE)
+
 
 
 ## genetic health ##
