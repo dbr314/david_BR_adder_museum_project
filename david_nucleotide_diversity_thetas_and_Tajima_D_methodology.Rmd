@@ -1,0 +1,481 @@
+---
+title: "david_Nucleotide_diversity_thetas_and_Tajima_D_methodology"
+author: "dbr314"
+date: "2026-09-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Nucleotide diversity and Tajima D output file creation in bash
+# Uses population site allele frequencies calculated for fst
+
+```bash
+
+# modern all and historic all calculation
+
+vim nhm.mod.thetas.sh
+
+#!/bin/bash --login
+#SBATCH --account=SCWF00035_a_barlow_33
+#SBATCH --job-name=thetas
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/logs/theta.out%J
+#job stderr file
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/logs/theta.err%J
+#SBATCH --time=0-15:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=10
+#SBATCH --mem=180G
+
+
+#load modules used by the script
+module purge
+module load angsd/0.935
+
+#arguments
+win1='50000'
+win2='10000' 
+step1='10000'  
+step2='2000'  
+
+
+# get 1d sfs for mod pop
+realSFS /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/mod_pop_saf.saf.idx -P 10 > /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod.sfs
+
+# get 1d sfs for nhm pop
+realSFS /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm_pop_saf.saf.idx -P 10 > /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/nhm.sfs
+
+#combine saf and sfs to generate per site theta values for mod pop
+realSFS saf2theta /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/mod_pop_saf.saf.idx -sfs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod.sfs -outname /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod
+
+#combine saf and sfs to generate per site theta values for nhm pop
+realSFS saf2theta /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/nhm_pop_saf.saf.idx -sfs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/nhm.sfs -outname /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/nhm
+
+#This will calculate the test statistic for mod pop using a window size of 50kb and a step size of 10kb as per the variable previously defined
+#Then a window size of 10kb and a step size of 2kb
+
+thetaStat do_stat /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod.thetas.idx -win $win1 -step $step1 -outnames /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod.50kb.thetas.txt
+thetaStat do_stat /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod.thetas.idx -win $win2 -step $step2 -outnames /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod.10kb.thetas.txt
+
+#This will calculate the test statistic for nhm using a window size of 50kb and a step size of 10kb as per the variable previously defined. 
+#Then a window size of 10kb and a step size of 2kb
+
+thetaStat do_stat /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/nhm.thetas.idx -win $win1 -step $step1 -outnames /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/nhm.50kb.thetas.txt
+thetaStat do_stat /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/nhm.thetas.idx -win $win2 -step $step2 -outnames /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/nhm.10kb.thetas.txt
+
+
+
+## modern bro_lyn calculation
+
+vim mod_S9.thetas.sh
+
+#!/bin/bash --login
+#SBATCH --account=SCWF00035_a_barlow_33
+#SBATCH --job-name=thetas_S9
+#SBATCH --output=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/logs/theta_S9.out%J
+#job stderr file
+#SBATCH --error=/scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/logs/theta_S9.err%J
+#SBATCH --time=0-10:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=10
+#SBATCH --mem=180G
+
+
+#load modules used by the script
+module purge
+module load angsd/0.935
+
+#arguments
+win1='50000'
+step1='10000'  
+
+
+# get 1d sfs for mod pop
+realSFS /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/mod_pop_saf.saf.idx -P 10 > /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod_S9.sfs
+
+#combine saf and sfs to generate per site theta values for mod pop
+realSFS saf2theta /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/mod_pop_saf.saf.idx -sfs /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod_S9.sfs -outname /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod_S9
+
+#This will calculate the test statistic for mod pop using a window size of 50kb and a step size of 10kb as per the variable previously defined
+
+
+thetaStat do_stat /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod_S9.thetas.idx -win $win1 -step $step1 -outnames /scratch/SCWF00035/people/b.dvb25fyc_david/BEARCAVE2/fst/thetas/mod_S9.50kb.thetas.txt
+```
+
+# plotting nucleotide diversity (thetas) in R for all samples
+
+```{r, echo=FALSE, eval=TRUE}
+library(dplyr)
+library(ggplot2)
+
+
+setwd("C:/Users/dange/theta_output")
+
+dbr_files_50 <- c(
+  "mod.50kb.thetas.txt.pestPG",
+  "nhm.50kb.thetas.txt.pestPG",
+  "mod_S9.50kb.thetas.txt.pestPG"
+)
+
+pop_colors <- c("#999999", "#E7298A", "#556B2F")
+pop_names  <- c("modern_all", "historic_all", "modern_bro_lyn")
+
+# --- Read both files ---
+mod <- read.table(dbr_files_50[1], header = TRUE)
+nhm <- read.table(dbr_files_50[2], header = TRUE)
+s9 <- read.table(dbr_files_50[3], header = TRUE)
+
+# column tp has the data relating to thetas
+# seperate and plot the mean of each chr average for each population 
+
+
+# Mean nucleotide diversity (tP) per chromosome
+# Modern vs historical
+
+# Calculate mean tP for each chromosome
+
+mod_chr <- mod %>%
+  group_by(Chr) %>%
+  summarise(
+    mean_tP = mean(tP, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    group = "modern_all"
+  )
+
+
+nhm_chr <- nhm %>%
+  group_by(Chr) %>%
+  summarise(
+    mean_tP = mean(tP, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    group = "historical_all"
+  )
+
+s9_chr <- s9 %>%
+  group_by(Chr) %>%
+  summarise(
+    mean_tP = mean(tP, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    group = "modern_bro_lyn"
+  )
+
+
+# Combine the two datasets
+
+tp_chr <- bind_rows(
+  mod_chr,
+  nhm_chr,
+  s9_chr
+)
+
+
+# Set order of groups
+tp_chr$group <- factor(
+  tp_chr$group,
+  levels = c("historical_all", "modern_all", "modern_bro_lyn")
+)
+
+
+# boxplot with standard 1.5x Q1/Q3 whiskers
+
+ggplot(
+  tp_chr,
+  aes(
+    x = group,
+    y = mean_tP,
+    fill = group
+  )
+) +
+  
+  # Boxplots
+  geom_boxplot(
+    width = 0.55,
+    colour = "black",
+    linewidth = 0.7,
+    alpha = 0.45,
+    outlier.shape = NA
+  ) +
+  
+  stat_boxplot(
+    geom = "errorbar",
+    width = 0.18,
+    linewidth = 0.7,
+    colour = "black"
+  ) +
+  
+  # Individual chromosome means
+  geom_jitter(
+    aes(
+      colour = group
+    ),
+    width = 0.08,
+    height = 0,
+    size = 2.5,
+    alpha = 0.95
+  ) +
+  
+  # Requested colours
+  scale_fill_manual(
+    values = c(
+      "modern_all" = "#999999",
+      "historical_all" = "#E7298A",
+      "modern_bro_lyn" = "#556B2F"
+    )
+  ) +
+  
+  scale_colour_manual(
+    values = c(
+      "modern_all" = "#666666",
+      "historical_all" = "#E7298A",
+      "modern_bro_lyn" = "#556B2F"
+    )
+  ) +
+  
+  
+  # Axis labels 
+  
+  labs(
+    title = "Mean nucleotide diversity per chr for all samples",
+    x = NULL,
+    y = "Mean nucleotide diversity (π)"
+  ) +
+  
+  scale_y_continuous(
+    breaks = seq(
+      floor(min(tp_chr$mean_tP) / 5) * 5,
+      ceiling(max(tp_chr$mean_tP) / 5) * 5,
+      by = 5
+    ),
+    expand = expansion(mult = c(0.02, 0.05))
+  ) +
+  
+  
+  # Publication-style theme
+  theme_classic(
+    base_size = 14
+  ) +
+  
+  theme(
+    # Axis
+    axis.title.y = element_text(
+      size = 14,
+      colour = "black"
+    ),
+    
+    axis.text.x = element_text(
+      size = 13,
+      colour = "black",
+      face = "bold"
+    ),
+    
+    axis.text.y = element_text(
+      size = 12,
+      colour = "black"
+    ),
+    
+    # Tick marks
+    axis.ticks = element_line(
+      colour = "black",
+      linewidth = 0.5
+    ),
+    
+    axis.ticks.length = unit(
+      0.2,
+      "cm"
+    ),
+    
+    # Remove legend because group identity is explicit
+    # on the x-axis
+    legend.position = "none",
+    
+    # Figure margins
+    plot.margin = margin(
+      t = 10,
+      r = 10,
+      b = 10,
+      l = 10,
+      unit = "pt"
+    )
+  )
+
+
+
+# run wilcox test 
+# tp = nucleotide diversity metric 
+
+wilcox.test(mod$tP, nhm$tP)
+
+
+# W = 9154207875, p-value < 2.2e-16
+# alternative hypothesis: true location shift is not equal to 0
+
+# wilcox test modern_bro_lyn vs nhm
+wilcox.test(s9$tP, nhm$tP)
+
+# W = 8138722597, p-value < 2.2e-16
+# alternative hypothesis: true location shift is not equal to 0
+
+# a significant difference between the 2 groups and nhm
+```
+
+
+# plotting Tajima D statistic in R for all samples 
+
+```{r, echo=FALSE, eval=TRUE}
+# Tajima's D boxplots#
+
+wilcox.test(mod$Tajima, nhm$Tajima)
+
+# data:  mod$Tajima and nhm$Tajima
+# W = 1.8124e+10, p-value < 2.2e-16
+# alternative hypothesis: true location shift is not equal to 0
+
+wilcox.test(s9$Tajima, nhm$Tajima)
+
+# W = 1.7597e+10, p-value < 2.2e-16
+# alternative hypothesis: true location shift is not equal to 0
+
+
+# create mean chr value dataframe for modern and historic #
+
+tajima_by_chr <- aggregate(Tajima ~ Chr, data = mod, FUN = mean, na.rm = TRUE)
+
+tajima_by_chr_hist <- aggregate(Tajima ~ Chr, data = nhm, FUN = mean, na.rm = TRUE)
+
+tajima_by_chr_s9 <- aggregate(Tajima ~ Chr, data = s9, FUN = mean, na.rm = TRUE)
+
+
+# Create chromosome groups nhm 
+
+plot_data <- bind_rows(
+  tajima_by_chr %>%
+    mutate(Population = "Modern_all"),
+  tajima_by_chr_hist %>%
+    mutate(Population = "Historical"),
+  tajima_by_chr_s9 %>%
+    mutate(Population = "Modern_bro_lyn")
+)
+
+# Set population order
+plot_data$Population <- factor(
+  plot_data$Population,
+  levels = c("Modern_all", "Historical", "Modern_bro_lyn")
+)
+
+# Calculate boxplot statistics for explicit whisker caps
+box_stats <- plot_data %>%
+  group_by(Population) %>%
+  summarise(
+    Q1 = quantile(Tajima, 0.25, na.rm = TRUE),
+    Q3 = quantile(Tajima, 0.75, na.rm = TRUE),
+    IQR = IQR(Tajima, na.rm = TRUE),
+    lower_limit = Q1 - 1.5 * IQR,
+    upper_limit = Q3 + 1.5 * IQR,
+    lower_whisker = min(Tajima[Tajima >= lower_limit], na.rm = TRUE),
+    upper_whisker = max(Tajima[Tajima <= upper_limit], na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Plot
+p <- ggplot(
+  plot_data,
+  aes(
+    x = Population,
+    y = Tajima,
+    fill = Population,
+    colour = Population
+  )
+) +
+  
+  # Boxplot
+  geom_boxplot(
+    width = 0.55,
+    alpha = 0.25,
+    coef = 1.5,
+    outlier.shape = NA,
+    median.colour = "black",
+    median.linewidth = 0.4,
+    linewidth = 0.7
+  ) +
+  
+  
+  # Individual chromosome values
+  geom_jitter(
+    width = 0.12,
+    height = 0,
+    alpha = 1,
+    size = 2.5
+  ) +
+  
+  # Explicit whisker caps
+  geom_errorbar(
+    data = box_stats,
+    aes(
+      x = Population,
+      ymin = lower_whisker,
+      ymax = upper_whisker
+    ),
+    inherit.aes = FALSE,
+    width = 0.18,
+    linewidth = 0.7,
+    colour = "black"
+  ) +
+  
+  # Population colours
+  scale_fill_manual(
+    values = c(
+      "Modern_all" = "#999999",
+      "Historical" = "#E7298A",
+      "Modern_bro_lyn" = "#556B2F"
+    )
+  ) +
+  
+  scale_colour_manual(
+    values = c(
+      "Modern_all" = "#999999",
+      "Historical" = "#E7298A",
+      "Modern_bro_lyn" = "#556B2F"
+    )
+  ) +
+  
+  labs(
+    title = "Mean Tajima D per chr for all samples",
+    x = NULL,
+    y = "Tajima D"
+  ) +
+  
+  theme_classic(base_size = 14) +
+  
+  theme(
+    plot.title = element_text(
+      size = 16,
+      face = "bold",
+      hjust = 0.5
+    ),
+    axis.title.y = element_text(
+      size = 14,
+      face = "bold"
+    ),
+    axis.text.x = element_text(
+      size = 13,
+      colour = "black",
+      face = "bold"
+    ),
+    axis.text.y = element_text(
+      size = 11,
+      colour = "black"
+    ),
+    legend.position = "none"
+  )
+
+p
+```
+
