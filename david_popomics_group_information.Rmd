@@ -9,22 +9,58 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+### Project update from ya boi
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
-summary(cars)
-```
+# week beginning
 
-## Including Plots
+14.09.26
 
-You can also embed plots, for example:
+# Work achieved
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
+Methodology document ordered in relation to results
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Accurate sample map with scale bars and location in UK map inset 
+
+Additional work re-formatting graphs and figures for the final thesis
+
+# Problems
+
+no problems
+
+
+# Future work
+
+Some minor changes to results, including manhattan plots focusing on chr_7 instead of chr_1 and the removal of DNA damaged samples from some additional graphs 
+
+
+
+# week beginning
+
+21.09.26
+
+
+# Work achieved
+
+Github repo created and synced with local machine containing all bash and r code for the project to this date
+
+Thetas and Tajima D run for just modern day bro_lyn and data added to existing boxplots 
+
+Plotting ngsadmix results
+
+Previous week meeting edits made to graphs and figures
+
+
+# Problems
+
+fst job failed due to lack of memory
+fst job failed due to error 134 (disk quota space for the project ran out??)
+
+
+# Future work
+
+writing up the methodology for fieldwork and labwork
+
+Resume editting introduction and have method section + result fully formated by next week meeting 
+
